@@ -1,3 +1,5 @@
+This version is still under development. Please use pyCmpl as part of CMPL 1.12 until a first stable version of CMPL 2 and pyCmpl3 is released.
+
 *********** pyCMPLr ********
 pyCMPL is the CMPL API  for Python and an interactive shell. 
 The main idea of this API is 

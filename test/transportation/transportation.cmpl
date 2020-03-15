@@ -1,0 +1,12 @@
+%data : plants set, centers set, routes set[2], c[routes] , s[plants] , d[centers]
+
+variables:
+ 	x[routes]: real[0..];
+objectives:
+ 	costs: sum{ [i,j] in routes : c[i,j]*x[i,j] } ->min;
+constraints:
+ 	{i in plants : supplies[i]: sum{j in routes *> [i,*] : x[i,j]} = s[i];}
+ 	{j in centers: demands[j]: sum{i in routes *> [*,j] : x[i,j]} <= d[j];} 
+ 
+ 
+ 

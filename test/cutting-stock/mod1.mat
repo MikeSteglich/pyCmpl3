@@ -1,0 +1,9 @@
+Variable name                   use[20]        use[45]        use[50]        use[55]        use[75]
+Variable type                         I              I              I              I              I
+
+line[1]             max        0.200000       0.500000       0.500000       0.500000       1.000000
+   Subject to                                                                                                  RHS
+line[2]             L                20             45             50             55             75            110
+
+Lower Bound                           0              0              0              0              0
+Upper Bound                                                                                        
