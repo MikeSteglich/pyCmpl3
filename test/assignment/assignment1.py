@@ -21,7 +21,7 @@ try:
 	m.setParameters(c)
 	#m.debug()
 	m.setOutput(True)
-	#m.connect("http://127.0.0.1:8008")
+	m.connect("http://127.0.0.1:8008")
 	
 	m.solve()
 

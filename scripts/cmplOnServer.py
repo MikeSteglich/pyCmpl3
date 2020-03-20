@@ -89,8 +89,7 @@ if tmpStr!="" :
 try:
 	
 	if asyncMode == 0:
-
-                model = Cmpl(cmplFile)
+		model = Cmpl(cmplFile)
 		model.setOptionsList(optionsList)
 		model.setOutput(True, "")
 	
@@ -106,7 +105,7 @@ try:
 		
 		if model.cmplStatus==CMPL_WARNINGS:
 			for m in model.cmplMessages:
-				print m.type, m.file, m.line, m.description
+				print(m.type, m.file, m.line, m.description)
 	
 		if model.solverStatus == SOLVER_OK:
 			if not (model.cmplSolFile != "" or model.asciiSolFile != "" or model.csvSolFile != ""):
@@ -149,7 +148,7 @@ try:
 			
 		if model.cmplStatus==CMPL_WARNINGS:
 			for m in model.cmplMessages:
-				print m.type, m.file, m.line, m.description
+				print(m.type, m.file, m.line, m.description)
 
 		if model.solverStatus == SOLVER_OK:
 			if not (model.cmplSolFile != "" or model.asciiSolFile != "" or model.csvSolFile != ""):
@@ -162,39 +161,39 @@ try:
 		model.setAsyncMode(asyncMode)
 		model.cancel()
 
-		print "Problem is canceled ..."
+		print("Problem is canceled ...")
 		
 			
 			
-except CmplException, e:
+except CmplException as e:
 	if e.msg.startswith("pyCmpl error: Model is still running, cannot retrieve the solution"):
-		print e.msg
+		print(e.msg)
 		if model.cmplStatus!=PROBLEM_FINISHED and model.cmplStatus!=PROBLEM_CANCELED:
 			model.dump()
 
 	elif not isMessageFlag :
-		print e.msg
+		print(e.msg)
 		isError=True
 	elif not e.msg.startswith("pyCmpl error: Cmpl finished with errors"):
-		print e.msg
+		print(e.msg)
 		isError=True
 		
 	
-except IOError, e:
-	print str(sys.exc_info()[1])
+except IOError as e:
+	print(str(sys.exc_info()[1]))
 	isError=True
 	
 except: 
 	isError=True
-	print str(sys.exc_info()[1])
+	print(str(sys.exc_info()[1]))
 	#traceback.print_exc(file=sys.stdout)
 	
-try:	
-        if isMessageFlag and (asyncMode==0 or asyncMode==3) and not isError:
+try:
+	if isMessageFlag and (asyncMode==0 or asyncMode==3) and not isError:
 		model.saveCmplMessageFile(messageFile)
 	
-except CmplException, e:
-	print e.msg
+except CmplException as e:
+	print(e.msg)
 except:
-	print str(sys.exc_info()[1])
+	print(str(sys.exc_info()[1]))
 	traceback.print_exc(file=sys.stdout)

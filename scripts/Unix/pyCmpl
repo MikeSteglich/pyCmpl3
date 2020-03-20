@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of pyCMPL 
  #
- #  Copyright (C) 2013
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -29,9 +29,14 @@
 
 #!/bin/bash
 
-CmplProgPath="`dirname \"$0\"`"/../../../
-export PYTHONPATH="$CmplProgPath"pyCmpl/lib3
-export CMPLBINARY="$CmplProgPath"bin/cmpl 
-export PYTHONSTARTUP="$CmplProgPath"pyCmpl/lib3/pyCmplShell.py 
+#CmplProgPath="`dirname \"$0\"`"/../../../
 
-python3 "$@"
+pyCmplPath="`dirname \"$0\"`"/../../
+export PYTHONPATH="$pyCmplPath"lib3
+
+if (($#>0))
+then
+    python3 "$@"
+else
+    echo "usage: pyCmpl <file>.py [args]"
+fi

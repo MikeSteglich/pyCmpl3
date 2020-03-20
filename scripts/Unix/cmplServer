@@ -28,11 +28,23 @@
  
 #!/bin/bash
 
-export PYTHONPATH=$PYTHONPATH:"$CmplProgPath"pyCmpl/lib:"$CmplProgPath"cmplServer
-export CMPLBINARY="$CmplProgPath"bin/cmpl
+#export PYTHONPATH=$PYTHONPATH:"$CmplProgPath"pyCmpl/lib:"$CmplProgPath"cmplServer
+#export CMPLBINARY="$CmplProgPath"bin/cmpl
 
-serverOpt="$CmplProgPath"cmplServer/cmplServer.opt
-serverHandler="$CmplProgPath"cmplServer/cmplServer/cmplServerHandler.py
+#serverOpt="$CmplProgPath"cmplServer/cmplServer.opt
+#serverHandler="$CmplProgPath"cmplServer/cmplServer/cmplServerHandler.py
+
+serverOpt="$CmplProgPath"bin/cmplServer.opt
+serverHandler="$CmplProgPath"pyCmpl/lib3/cmplServer/cmplServerHandler.py
+
+#pyCmplPath="`dirname \"$0\"`"/../../
+#export PYTHONPATH="$pyCmplPath"lib3
+
+echo "huhu"
+echo $PythonBin 
+
+
+
 
 function usage () 
 {
@@ -101,7 +113,7 @@ fi
 if [ $1 == "-start" ]; then
 	echo "Starting CmplServer ..."
 	rm ~/cmplServer.out 2>/dev/null
-	nohup python "$serverHandler" -start $cmplPort &>~/CmplServer/cmplServer.out &
+	nohup $PythonBin "$serverHandler" -start $cmplPort &>~/CmplServer/cmplServer.out &
 	sleep 2
 	cat ~/CmplServer/cmplServer.out
 	showLog
@@ -109,7 +121,7 @@ if [ $1 == "-start" ]; then
 elif [ $1 == "-startInGrid" ]; then
 	echo "Starting CmplServer and connecting to CmplGrid ..."
 	rm ~/cmplServer.out 2>/dev/null
-	nohup python "$serverHandler" -startInGrid $cmplPort &>~/CmplServer/cmplServer.out &
+	nohup $PythonBin  "$serverHandler" -startInGrid $cmplPort &>~/CmplServer/cmplServer.out &
 	sleep 2
 	cat ~/CmplServer/cmplServer.out
 	showLog
@@ -117,17 +129,17 @@ elif [ $1 == "-startInGrid" ]; then
 elif [ $1 == "-startScheduler" ]; then
 	echo "Starting CmplGridScheduler ..."
 	rm ~/cmplServer.out 2>/dev/null
-	nohup python "$serverHandler" -startScheduler $cmplPort &>~/CmplServer/cmplServer.out &
+	nohup $PythonBin  "$serverHandler" -startScheduler $cmplPort &>~/CmplServer/cmplServer.out &
 	sleep 2
 	cat ~/CmplServer/cmplServer.out
 	isGrid=1
 	showLog
 
 elif [ $1 == "-stop" ]; then
-	python "$serverHandler" -stop $cmplPort
+	$PythonBin  "$serverHandler" -stop $cmplPort
           
 elif [ $1 == "-status" ]; then
-	python "$serverHandler" -status $cmplPort
+	$PythonBin  "$serverHandler" -status $cmplPort
 else
 	usage
 fi

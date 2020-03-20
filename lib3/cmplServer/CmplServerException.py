@@ -26,24 +26,41 @@
  #
  #**********************************************************************
 
+#!/usr/bin/python 
 
-#!/bin/bash
+from .CmplServerTools import *
+import io
 
-#CmplProgPath="`dirname \"$0\"`"/../../../
-CmplProgPath="/Users/mike/Documents/Projekte/Cmpl2/"
-#CmplProgPath="/Applications/Cmpl/"
-echo $CmplProgPath
+#*************** CmplServerException ***********************************
+class CmplServerException(Exception):
+	
+	def __init__(self, msg, logFile=None ):
+		self.__msgStr=io.StringIO()
+	
+		if not "CmplServer error:" in msg: 
+			self.__msgStr.write("CmplServer error: " +msg)
+		else: 
+			self.__msgStr.write(msg)
+	
+		if logFile != None:
+			CmplServerTools.cmplLogging( logFile,  msg )
+		
+					
+	def __str__(self):
+		return "CmplServer error:"
+	
+	def __del__(self):
+		self.__msgStr.close()
+	
+	@property
+	def msg(self):
+		return self.__msgStr.getvalue()
+#*************** end CmplServerException *******************************
 
-#export PYTHONPATH=$PYTHONPATH:"$CmplProgPath"pyCmpl/lib3
-#export PYTHONPATH="$CmplProgPath"pyCmpl/lib3 
-export PYTHONPATH="$CmplProgPath"pyCmpl/lib
-echo $PYTHONPATH
 
-export CMPLBINARY="$CmplProgPath"bin/cmpl 
-echo $CMPLBINARY
+		
+		
+		
+		
 
-CmplProgPath="/Users/mike/Documents/Projekte/Cmpl2/"
-export PYTHONSTARTUP="$CmplProgPath"pyCmpl/lib3/pyCmplShell.py 
-echo $PYTHONSTARTUP
-
-
+		

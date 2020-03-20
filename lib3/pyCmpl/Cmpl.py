@@ -864,7 +864,6 @@ class Cmpl(threading.Thread):
 
             self.__problem = os.path.splitext(self.__model)[0]
 
-            #tmpPrefix = tempfile.gettempdir()+os.sep+self.__problem
             tmpPrefix = "cmpl__"+self.__id+"__"+self.__problem
 
             self.__cmplFile = tmpPrefix + ".cmpl"
@@ -872,12 +871,6 @@ class Cmpl(threading.Thread):
             self.__cmplDataFile = tmpPrefix  + ".cdat"
             self.__cmplMsgFile = tmpPrefix + ".cmsg"
             self.__cmplSolFile = tmpPrefix + ".csol"
-
-            #self.__cmplFile = tmpPrefix + "_" + self.__id + ".cmpl"
-
-            #self.__cmplDataFile = tmpPrefix + "_" + self.__id + ".cdat"
-            #self.__cmplMsgFile = tmpPrefix + "_" + self.__id + ".cmsg"
-            #self.__cmplSolFile = tmpPrefix + "_" + self.__id + ".csol"
 
 
             self.__cmplDataElements()
@@ -898,8 +891,6 @@ class Cmpl(threading.Thread):
             if self.__compatibility>2:
                 cmdList = [cmplBin, self.__cmplFile, "-solution"]
             else:
-                #tmpAlias = os.path.basename(self.__problem + "_" + self.__id)
-                #cmdList = [cmplBin, self.__model, "-solution", "-e", "-alias", tmpAlias]
                 cmdList = [cmplBin, self.__cmplFile, "-solution", "-e", self.__cmplMsgFile]
            
 
@@ -920,14 +911,8 @@ class Cmpl(threading.Thread):
                 cmdList.append("-cmsg")
                 cmdList.append(self.__cmplMsgFile)
 
-            print(cmdList)
+            #sprint(cmdList)
             self.__cmplProc = subprocess.Popen(cmdList, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-            # for line in iter(self.__cmplProc.stdout.readline, ''):
-            #	self.__handleOutput(line)
-
-            # while self.__cmplProc.poll() is None:
-            #	self.__handleOutput(self.__cmplProc.stdout.readline())
 
             while True:
                 line = self.__cmplProc.stdout.readline()
@@ -1152,7 +1137,7 @@ class Cmpl(threading.Thread):
 
                 self.__writeSolFiles()
 
-                ret = self.__cmplServerExecute("getCmplInfo")
+                '''ret = self.__cmplServerExecute("getCmplInfo")
                 self.__remoteStatus = ret[0]
                 if self.__remoteStatus == CMPLSERVER_ERROR:
                     self.__cleanUp()
@@ -1162,6 +1147,7 @@ class Cmpl(threading.Thread):
                     self.__cmplInfos.readCmplInfo(self.__cmplInfoString)
 
                 self.__writeInfoFiles()
+                '''
 
                 self.__cleanUp()
 
