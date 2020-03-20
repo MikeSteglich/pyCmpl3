@@ -1,8 +1,8 @@
 .DS_Store
 *.bak
-#.idea/
-#*.xml
-#*.iml
+.idea/
+*.xml
+*.iml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
