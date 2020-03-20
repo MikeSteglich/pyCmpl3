@@ -40,11 +40,6 @@ serverHandler="$CmplProgPath"pyCmpl/lib3/cmplServer/cmplServerHandler.py
 #pyCmplPath="`dirname \"$0\"`"/../../
 #export PYTHONPATH="$pyCmplPath"lib3
 
-echo "huhu"
-echo $PythonBin 
-
-
-
 
 function usage () 
 {
