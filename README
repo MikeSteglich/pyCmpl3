@@ -9,6 +9,13 @@ The main idea of this API is
 All variables, objective functions and constraints are defined in CMPL. 
 These functionalities can be used with a local CMPL installation or a CMPLServer.
 
+CMPLServer is an XML-RPC-based web service for distributed optimization.
+It is reasonable to solve large models remotely on the CMPLServer that is installed on a high performance system.
+pyCMPL provides a client API for CMPLServer. CMPL provides three XML-based file formats for the communication 
+between a CMPLServer and its clients. (CmplInstance, CmplSolutions, CmplMessages, CmplInfo)
+
+
+
 For further information please visit the CMPL website (www.coliop.org). 
 
 DOCUMENTATION:
