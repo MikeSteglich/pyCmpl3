@@ -58,21 +58,24 @@ for arg in sys.argv:
 			if not isMessageFlag:	
 				pos = len(optionsList)
 				if tmpStr!="":
-					if fileFlag:
-						tmpStr=tmpStr + "\""
-						fileFlag=False
+					#if fileFlag:
+					#	tmpStr=tmpStr + "\""
+					#	fileFlag=False
 					optionsList.update({pos:tmpStr})
 					
-				tmpStr = "%arg " +arg + " "	
-				if arg.strip().startswith("-solution") or arg.strip().startswith("-matrix") or arg.strip().startswith("-l") or arg.strip().startswith("-s") or arg.strip().startswith("-e")  :
-					tmpStr = tmpStr + "\""
-					fileFlag=True
+				#tmpStr = "%arg " +arg + " "
+				tmpStr = arg
+				#if arg.strip().startswith("-solution") or arg.strip().startswith("-matrix") or arg.strip().startswith("-l") or arg.strip().startswith("-s") or arg.strip().startswith("-e")  :
+				#	tmpStr = tmpStr + " \""
+				#	fileFlag=True
+
 		else:
-			if not isMessageFlag:	
-				if tmpStr.endswith("\""):
-					tmpStr = tmpStr + arg 
-				else:
-					tmpStr = tmpStr + " " +arg
+			if not isMessageFlag:
+				tmpStr+=" "+arg
+			#	if tmpStr.endswith("\""):
+			#		tmpStr = tmpStr + arg
+			#	else:
+			#		tmpStr = tmpStr + " " +arg
 			else:
 				#messageFile="\""+arg+"\""
 				messageFile=arg

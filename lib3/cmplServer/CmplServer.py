@@ -578,10 +578,10 @@ class CmplServer(object):
 				cmplInfoFile = problem+".cinf"
 					
 				msgStr=""
-				CmplServerTools.cmplLogging( self.__logFile,  "D1", id, self.__problemList[id].name )
+				#CmplServerTools.cmplLogging( self.__logFile,  "D1", id, self.__problemList[id].name )
 				if not (self.__problemList[id].status==CMPLSERVER_ERROR or self.__problemList[id].status==CMPL_FAILED) :
 					msgStr = CmplServerTools.readFileContent(cmplInfoFile)
-					CmplServerTools.cmplLogging( self.__logFile,  "D2", id, self.__problemList[id].name )
+					#CmplServerTools.cmplLogging( self.__logFile,  "D2", id, self.__problemList[id].name )
 				
 			except:
 				self.__problemList[id].setStatus(CMPLSERVER_ERROR)
@@ -972,16 +972,16 @@ class CmplServer(object):
 					problem = self.__cmplServerPath+id+os.sep+self.__problemList[id].name
 
 					if self.__compatibility>2:
-						cmdList = [cmplBin, problem, "-cmsg", "-solution"]
+						cmdList = [cmplBin, problem, "-config", ".modules-server", "-cmsg", "-solution"]
 					else:
 						cmdList = [cmplBin, problem, "-remote", "-e", "-includesForbidden"]
 						
-					#CmplServerTools.cmplLogging( self.__logFile, str(cmdList));
 					if len(self.__problemList[id].options) != 0:
 
 						if self.__compatibility>2:
 							for opt in self.__problemList[id].options:
-								tmpOpt = self.__problemList[id].options.split()
+								CmplServerTools.cmplLogging( self.__logFile, str(opt)+" "+str(type(opt)));
+								tmpOpt = opt.split()
 								for o in tmpOpt:
 									cmdList.append(o)
 						else: 
@@ -989,7 +989,7 @@ class CmplServer(object):
 								cmdList.append("-headerOpt")
 								cmdList.append(opt.replace(" ", "#"))
 
-
+					#CmplServerTools.cmplLogging( self.__logFile, str(cmdList));
 					pHandler = subprocess.Popen(cmdList, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 					self.__problemList[id].setProcessHandler( pHandler )
 					self.__problemList[id].setStatus(PROBLEM_RUNNING)
@@ -999,30 +999,7 @@ class CmplServer(object):
 					self.__problemList[id].setOutput("CmplServer - Solving problem has been started") 
 	
 					_thread.start_new_thread(self.__storeOutput, (id,)) 
-					
-					'''
-						try:
-							self.__runningProblems+=1
-						
-
-						while True:
-							line = pHandler.stdout.readline()
-
-							if len(line) > 0:
-								if type(line)==bytes:
-									line=line.decode("utf-8")
-					
-								self.__problemList[id].setOutput(line.rstrip())
-							else:
-								break
-
-						CmplServerTools.cmplLogging( self.__logFile,  "Solving problem has been finished" , id, self.__problemList[id].name)
-						self.__problemList[id].setOutput("CmplServer - Solving problem has been finished") 
-						self.__handleProblemQueue(id)
-					except:
-						CmplServerTools.cmplLogging( self.__logFile,  "Canceled by user: " +str(sys.exc_info()[1]) ) 
-					'''
-						
+										
 					ret = True
 		else:
 			self.__problemList[id].setStatus(CMPLSERVER_ERROR)
