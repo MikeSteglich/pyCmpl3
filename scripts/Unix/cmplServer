@@ -34,8 +34,8 @@
 #serverOpt="$CmplProgPath"cmplServer/cmplServer.opt
 #serverHandler="$CmplProgPath"cmplServer/cmplServer/cmplServerHandler.py
 
-serverOpt="$CmplProgPath"bin/cmplServer.opt
-serverHandler="$CmplProgPath"pyCmpl/lib3/cmplServer/cmplServerHandler.py
+serverOpt="$CMPLHOME"bin/cmplServer.opt
+serverHandler="$CMPLHOME"pyCmpl/lib3/cmplServer/cmplServerHandler.py
 
 #pyCmplPath="`dirname \"$0\"`"/../../
 #export PYTHONPATH="$pyCmplPath"lib3
@@ -71,6 +71,11 @@ function showLog()
 
 isLog=0
 isGrid=0
+
+if [ ! -f "$serverOpt" ]; then
+    echo "CmplServer option file not found! <$serverOpt>"
+	exit -1
+fi
 
 if [ $# == 0 ] || [ $# -gt 3 ] ; then
     usage

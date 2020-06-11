@@ -127,7 +127,7 @@ if len(sys.argv)==3:
 else:
 	port = None
 	
-print(port)
+#print(port)
 	
 if sys.argv[1]=="-start":
 	startCmplServer(port, STANDALONE_SERVER )

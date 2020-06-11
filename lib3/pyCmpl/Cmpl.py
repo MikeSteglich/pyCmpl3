@@ -26,7 +26,7 @@
 #
 # **********************************************************************
 
-# !/usr/bin/python
+# !/usr/bin/python3
 
 
 "pyCmpl - CMPL's python API "
@@ -882,7 +882,12 @@ class Cmpl(threading.Thread):
             shutil.copyfile(self.__model, self.__cmplFile)
             
             try:
-                cmplBin = os.environ['CMPLBINARY']
+                #cmplBin = os.environ['CMPLBINARY']
+                cmplBin = os.environ['CMPLHOME'] + 'bin'+ os.sep +"cmpl"
+
+                if sys.platform.startswith('win'):
+                    cmplBin+=".exe"
+  
                 if not os.path.exists(cmplBin):
                     raise CmplException("Can't find Cmpl binary: " + cmplBin)
             except:
@@ -963,9 +968,7 @@ class Cmpl(threading.Thread):
             self.__cmplGridScheduler = None
 
             try:
-
                 self.__cmplServer = xmlrpc.client.ServerProxy(cmplUrl)
-
                 self.__getSolver()
 
                 ret = self.__cmplServer.getJobId(os.path.basename(escape(self.__model)), self.__solver,
@@ -1137,7 +1140,7 @@ class Cmpl(threading.Thread):
 
                 self.__writeSolFiles()
 
-                '''ret = self.__cmplServerExecute("getCmplInfo")
+                ret = self.__cmplServerExecute("getCmplInfo")
                 self.__remoteStatus = ret[0]
                 if self.__remoteStatus == CMPLSERVER_ERROR:
                     self.__cleanUp()
@@ -1147,7 +1150,7 @@ class Cmpl(threading.Thread):
                     self.__cmplInfos.readCmplInfo(self.__cmplInfoString)
 
                 self.__writeInfoFiles()
-                '''
+              
 
                 self.__cleanUp()
 
@@ -1368,7 +1371,7 @@ class Cmpl(threading.Thread):
                 f.close()
                 self.__handleOutput("Solution written to CSV file: " + solFile)
             except IOError as e:
-                raise CmplException("IO error for file " + tmpName + ": " + e.strerror)
+                raise CmplException("IO error for file " + solFile + ": " + e.strerror)
 
         else:
             raise CmplException("No Solution found so far")
@@ -1625,7 +1628,7 @@ class Cmpl(threading.Thread):
         solverFound = False
         for o in list(self.__optionsList.values()):
             if "-solver" in o:
-                self.__solver = o.split()[2].replace("\"", "")
+                self.__solver = o.split()[1].replace("\"", "")
                 solverFound = True
                 break
         if not solverFound:
@@ -1866,7 +1869,7 @@ class Cmpl(threading.Thread):
                 self.__handleOutput("\n")
             else:
                 self.__writeAsciiFile(self.__cmplInfos.statisticsFileName, self.__cmplInfos.statisticsText)
-                self.__handleOutput("Statistics written to file: " + self.__cmplInfos.statisticsFileName)
+                self.__handleOutput("CMPL: Statistics written to file: " + self.__cmplInfos.statisticsFileName)
 
         if self.__cmplInfos.varProdFileName != "":
             if self.__cmplInfos.varProdFileName == "stdOut":
@@ -1874,7 +1877,7 @@ class Cmpl(threading.Thread):
                 self.__handleOutput("\n")
             else:
                 self.__writeAsciiFile(self.__cmplInfos.varProdFileName, self.__cmplInfos.varProdtext)
-                self.__handleOutput("Variable products statistics written to file: " + self.__cmplInfos.varProdFileName)
+                self.__handleOutput("CMPL: Variable products statistics written to file: " + self.__cmplInfos.varProdFileName)
 
         if self.__cmplInfos.matrixFileName != "":
             if self.__cmplInfos.matrixFileName == "stdOut":
@@ -1882,7 +1885,7 @@ class Cmpl(threading.Thread):
                 self.__handleOutput("\n")
             else:
                 self.__writeAsciiFile(self.__cmplInfos.matrixFileName, self.__cmplInfos.matrixText)
-                self.__handleOutput("Generated matrix written to file: " + self.__cmplInfos.matrixFileName)
+                self.__handleOutput("CMPL: Generated matrix written to file: " + self.__cmplInfos.matrixFileName)
 
     # *********** end writeInfoFiles ******
 

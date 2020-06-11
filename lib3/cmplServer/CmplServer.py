@@ -263,11 +263,13 @@ class CmplServer(object):
 			raise CmplServerException( "Cannot read CmplServer log file <"+self.__logFile+"> " + e.strerror )
 		
 		try:
+
+			self.__optFileName=""
 			try:
-				self.__optFileName=os.environ['CMPLSERVEROPT']	
+				self.__optFileName=os.environ['CMPLHOME']+'bin'+os.sep+'cmplServer.opt'	
 			except:
-				self.__optFileName=os.path.dirname(os.path.abspath(sys.argv[0])) + os.sep + ".." + os.sep + ".." + os.sep+ ".." + os.sep+ "bin"+ os.sep+ "cmplServer.opt"
-				
+				raise CmplException("Can't read CmplServer option file binary <" + self.__optFileName+">")
+			
 			f = open(self.__optFileName, "r") 
 			for line in f: 
 				ret=line.split("=")
@@ -957,7 +959,9 @@ class CmplServer(object):
 		if self.__checkId(id):
 		
 			try:
-				cmplBin=os.environ['CMPLBINARY']
+				cmplBin = os.environ['CMPLHOME'] + 'bin'+ os.sep +"cmpl"
+				if sys.platform.startswith('win'):
+					cmplBin+=".exe"
 			except:
 				self.__problemList[id].setStatus(CMPLSERVER_ERROR)
 				self.__problemList[id].setStatusMessage("Starting solving failed: " +str(sys.exc_info()[1]))
@@ -989,7 +993,7 @@ class CmplServer(object):
 								cmdList.append("-headerOpt")
 								cmdList.append(opt.replace(" ", "#"))
 
-					#CmplServerTools.cmplLogging( self.__logFile, str(cmdList));
+					CmplServerTools.cmplLogging( self.__logFile, str(cmdList));
 					pHandler = subprocess.Popen(cmdList, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 					self.__problemList[id].setProcessHandler( pHandler )
 					self.__problemList[id].setStatus(PROBLEM_RUNNING)

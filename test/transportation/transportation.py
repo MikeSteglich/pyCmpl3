@@ -28,7 +28,9 @@ try:
 		
 	model.setOutput(True)
 	model.setOption("-display nonZeros")
+
 	model.solve() 
+
 			
 	if model.solverStatus == SOLVER_OK:
 		model.solutionReport()
