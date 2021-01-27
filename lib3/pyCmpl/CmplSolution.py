@@ -394,7 +394,7 @@ class CmplSolutions(object):
 				if "<constraintsDisplayOptions" in line:
 					self.__conDisplayOptions = re.findall("<constraintsDisplayOptions>([^\"]*)</constraintsDisplayOptions>", line)[0]
 					continue
-				'''if "<asciiSolFile" in line:
+				if "<asciiSolFile" in line:
 					self.__asciiSolFile = re.findall("<asciiSolFile>([^\"]*)</asciiSolFile>", line)[0]
 					continue
 				if "<csvSolFile" in line:
@@ -403,7 +403,7 @@ class CmplSolutions(object):
 				if "<cmplSolFile" in line:
 					self.__cmplSolFile = re.findall("<cmplSolFile>([^\"]*)</cmplSolFile>", line)[0]
 					continue	
-				'''
+				
 			
 			if solutionSection:
 				if "<variables>" in line:

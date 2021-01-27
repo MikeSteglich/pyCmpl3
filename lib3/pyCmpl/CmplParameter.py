@@ -94,7 +94,7 @@ class CmplParameter(object):
 			#if type(val) != list:
 				self.__valueList.append(val)
 			else:
-				raise CmplException("incompatible data for a scalar parameter : " + str(val) )
+				raise CmplException("incompatible data for scalar parameter <"+ self.__name +"> : " + str(val) )
 		else:
 			if  'LIST' in str(type(val)).upper():
 			#if type(val) == list:
@@ -105,7 +105,7 @@ class CmplParameter(object):
 					
 				self.__count = self.__countElements(val)		
 				if self.__count !=  sCount :
-					raise CmplException("The dimension of the paramter "+ self.__name +" doesn't match the dimension of the set(s)."  )
+					raise CmplException("The dimension of the paramter <"+ self.__name +"> doesn't match the dimension of the set(s)."  )
 
 			elif  'DICT' in str(type(val)).upper():
 			#elif type(val) == dict:
@@ -116,7 +116,7 @@ class CmplParameter(object):
 				if defaultVal!=None:
 					#sparse array with default
 					if not (type(defaultVal) != str or type(defaultVal) != int or type(defaultVal) != int or type(defaultVal) != float ):
-						raise CmplException("Wrong type of the default value of the paramter "+ self.__name +" : " + str(defaultVal) + " : " + type(defaultVal)  )
+						raise CmplException("Wrong type of the default value of the paramter <"+ self.__name +"> : " + str(defaultVal) + " : " + type(defaultVal)  )
 						
 					self.__defaultVal=defaultVal
 				
@@ -135,7 +135,7 @@ class CmplParameter(object):
 						raise CmplException("Unexpected data type for paramter "+ self.__name   )
 					
 			else:
-				raise CmplException("incompatible data for a parameter array: " + str(val) )
+				raise CmplException("incompatible data for parameter array <"+ self.__name +"> : " + str(val) )
 	
 	#*********** end values *********
 	

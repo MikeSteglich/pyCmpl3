@@ -48,7 +48,7 @@ class CmplTools(object):
 	#*********** strIsNumber ***********************
 	@staticmethod
 	def strIsNumber(str):
-		r = re.compile('[^0-9.]+')
+		r = re.compile('[^\-\+0-9.]+')
 		if  r.search(str):
 			return False
 		else:

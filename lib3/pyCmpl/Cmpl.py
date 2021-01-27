@@ -1,7 +1,7 @@
 # ***********************************************************************
 #  This code is part of pyCMPL
 #
-#  Copyright (C) 2013 - 2019
+#  Copyright (C) 
 #  Mike Steglich - Technical University of Applied Sciences
 #  Wildau, Germany
 #
@@ -26,12 +26,12 @@
 #
 # **********************************************************************
 
-# !/usr/bin/python3
+# !/usr/bin/python
 
 
 "pyCmpl - CMPL's python API "
 __author__ = "Mike Steglich"
-__copyright__ = "Copyright (C) 2013 - 2020 Mike Steglich"
+__copyright__ = "Copyright (C) Mike Steglich"
 __license__ = "LGPLv3"
 __version__ = "2.0.0"
 # Feb 2020
@@ -150,8 +150,8 @@ class Cmpl(threading.Thread):
 
         self.__modelDef = None
 
-        # if not os.path.isfile(model):
-        #	raise CmplException("CMPL file " + model + " does not exist."  )
+        if not os.path.isfile(model):
+            raise CmplException("CMPL file " + model + " does not exist."  )
 
         #self.__id = str(random.randint(100000, 999999))
 
@@ -633,6 +633,7 @@ class Cmpl(threading.Thread):
         else:
             if len(set.valueList) != 0:
                 self.__setList.append(set)
+                exec('self.'+set.name+'=set')
             else:
                 raise CmplException("set " + set.name() + " contains no elements ")
 
@@ -641,7 +642,11 @@ class Cmpl(threading.Thread):
     # *********** setSets *****************
     def setSets(self, *set):
         for s in set:
-            self.setSet(s)
+            if type(s)==list:
+                for e in s:
+                    self.setSet(e)
+            else:
+                self.setSet(s)
 
     # *********** end setSets *************
 
@@ -652,15 +657,20 @@ class Cmpl(threading.Thread):
         else:
             if len(param.values) != 0:
                 self.__parameterList.append(param)
+                exec('self.'+param.name+'=param')
             else:
-                raise CmplException("parameter " + param.name() + " contains no elements ")
+                raise CmplException("parameter " + param.name + " contains no elements ")
 
     # *********** end setParameter ********
 
     # *********** setSets *****************
     def setParameters(self, *params):
         for p in params:
-            self.setParameter(p)
+            if type(p)==list:
+                for e in p:
+                    self.setParameter(e)
+            else:
+                self.setParameter(p)
 
     # *********** end setSets *************
 
@@ -864,7 +874,8 @@ class Cmpl(threading.Thread):
 
             self.__problem = os.path.splitext(self.__model)[0]
 
-            tmpPrefix = "cmpl__"+self.__id+"__"+self.__problem
+            #tmpPrefix = "cmpl__"+self.__id+"__"+self.__problem
+            tmpPrefix = self.__problem+"_cmpl__"+self.__id
 
             self.__cmplFile = tmpPrefix + ".cmpl"
 
@@ -882,12 +893,7 @@ class Cmpl(threading.Thread):
             shutil.copyfile(self.__model, self.__cmplFile)
             
             try:
-                #cmplBin = os.environ['CMPLBINARY']
-                cmplBin = os.environ['CMPLHOME'] + 'bin'+ os.sep +"cmpl"
-
-                if sys.platform.startswith('win'):
-                    cmplBin+=".exe"
-  
+                cmplBin = os.environ['CMPLBINARY']
                 if not os.path.exists(cmplBin):
                     raise CmplException("Can't find Cmpl binary: " + cmplBin)
             except:
@@ -937,6 +943,9 @@ class Cmpl(threading.Thread):
             self.__solutions.readSolution()
             self.__writeSolFiles()
 
+            self.conByName()
+            self.varByName()
+
             self.__cleanUp()
 
     # *********** end solve ***************
@@ -968,7 +977,9 @@ class Cmpl(threading.Thread):
             self.__cmplGridScheduler = None
 
             try:
+
                 self.__cmplServer = xmlrpc.client.ServerProxy(cmplUrl)
+
                 self.__getSolver()
 
                 ret = self.__cmplServer.getJobId(os.path.basename(escape(self.__model)), self.__solver,
@@ -1140,7 +1151,7 @@ class Cmpl(threading.Thread):
 
                 self.__writeSolFiles()
 
-                ret = self.__cmplServerExecute("getCmplInfo")
+                '''ret = self.__cmplServerExecute("getCmplInfo")
                 self.__remoteStatus = ret[0]
                 if self.__remoteStatus == CMPLSERVER_ERROR:
                     self.__cleanUp()
@@ -1150,7 +1161,7 @@ class Cmpl(threading.Thread):
                     self.__cmplInfos.readCmplInfo(self.__cmplInfoString)
 
                 self.__writeInfoFiles()
-              
+                '''
 
                 self.__cleanUp()
 
@@ -1371,7 +1382,7 @@ class Cmpl(threading.Thread):
                 f.close()
                 self.__handleOutput("Solution written to CSV file: " + solFile)
             except IOError as e:
-                raise CmplException("IO error for file " + solFile + ": " + e.strerror)
+                raise CmplException("IO error for file " + tmpName + ": " + e.strerror)
 
         else:
             raise CmplException("No Solution found so far")
@@ -1415,7 +1426,8 @@ class Cmpl(threading.Thread):
 
         if not self.__isCleaned:
             if self.__debug:
-                eval(input("Hit Enter to exit"))
+                #eval(input("Hit Enter to exit"))
+                input("Hit Enter to exit")
 
             if self.__remoteMode:
 
@@ -1628,7 +1640,7 @@ class Cmpl(threading.Thread):
         solverFound = False
         for o in list(self.__optionsList.values()):
             if "-solver" in o:
-                self.__solver = o.split()[1].replace("\"", "")
+                self.__solver = o.split()[2].replace("\"", "")
                 solverFound = True
                 break
         if not solverFound:
@@ -1869,7 +1881,7 @@ class Cmpl(threading.Thread):
                 self.__handleOutput("\n")
             else:
                 self.__writeAsciiFile(self.__cmplInfos.statisticsFileName, self.__cmplInfos.statisticsText)
-                self.__handleOutput("CMPL: Statistics written to file: " + self.__cmplInfos.statisticsFileName)
+                self.__handleOutput("Statistics written to file: " + self.__cmplInfos.statisticsFileName)
 
         if self.__cmplInfos.varProdFileName != "":
             if self.__cmplInfos.varProdFileName == "stdOut":
@@ -1877,7 +1889,7 @@ class Cmpl(threading.Thread):
                 self.__handleOutput("\n")
             else:
                 self.__writeAsciiFile(self.__cmplInfos.varProdFileName, self.__cmplInfos.varProdtext)
-                self.__handleOutput("CMPL: Variable products statistics written to file: " + self.__cmplInfos.varProdFileName)
+                self.__handleOutput("Variable products statistics written to file: " + self.__cmplInfos.varProdFileName)
 
         if self.__cmplInfos.matrixFileName != "":
             if self.__cmplInfos.matrixFileName == "stdOut":
@@ -1885,7 +1897,7 @@ class Cmpl(threading.Thread):
                 self.__handleOutput("\n")
             else:
                 self.__writeAsciiFile(self.__cmplInfos.matrixFileName, self.__cmplInfos.matrixText)
-                self.__handleOutput("CMPL: Generated matrix written to file: " + self.__cmplInfos.matrixFileName)
+                self.__handleOutput("Generated matrix written to file: " + self.__cmplInfos.matrixFileName)
 
     # *********** end writeInfoFiles ******
 
