@@ -1,0 +1,62 @@
+<?xml version = "1.0" encoding="UTF-8" standalone="yes"?>
+<CmplInstance version="1.0">
+<general>
+<name>transportation.cmpl</name>
+<jobId>S127.0.0.1-2020-05-14-08-57-12-824984</jobId>
+</general>
+<options>
+<opt>-display nonZeros</opt>
+</options>
+<problemFiles>
+<file name="transportation.cmpl" type="cmplMain">
+%data cmplData---transportation.cdat  : plants set, centers set, routes set[2], c[routes] , s[plants] , d[centers]
+
+variables:
+ 	x[routes]: real[0..];
+objectives:
+ 	costs: sum{ [i,j] in routes : c[i,j]*x[i,j] } -&gt;min;
+constraints:
+ 	{i in plants : supplies[i]: sum{j in routes *&gt; [i,*] : x[i,j]} = s[i];}
+ 	{j in centers: demands[j]: sum{i in routes *&gt; [*,j] : x[i,j]} &lt;= d[j];} 
+ 
+ 
+ 
+</file>
+<file name="cmplData---transportation.cdat" type="cmplData">
+%routes set[2] &lt; 
+1 1 
+1 2 
+1 4 
+2 2 
+2 3 
+2 4 
+3 1 
+3 3 
+&gt;
+%plants set &lt; 1..3 &gt;
+%centers set &lt; 1..4 &gt;
+%c[routes]  &lt;
+3
+2
+6
+5
+2
+3
+2
+4
+&gt;
+%s[plants]  &lt;
+5000
+6000
+2500
+&gt;
+%d[centers]  &lt;
+6000
+4000
+2000
+2500
+&gt;
+
+</file>
+</problemFiles>
+</CmplInstance>

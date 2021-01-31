@@ -1,0 +1,15 @@
+#!/bin/bash
+
+
+
+echo "######### start pyCmpl tests #############################"
+./test-pyCmpl diet.py 
+./test-pyCmpl complex-method.py	
+./test-pyCmpl cut.py 
+./test-pyCmpl assignment.py 
+./test-pyCmpl transportation.py 
+./test-pyCmpl prodmix.py 
+./test-pyCmpl assignment-remote.py 
+
+
+echo "######### pyCmpl tests done #############################"

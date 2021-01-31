@@ -1,0 +1,11 @@
+%data : machines set, locations set, combinations set[2], c[combinations] 
+
+variables:
+	x[combinations]: binary;
+
+objectives:
+	costs: sum{  [i,j] in combinations : c[i,j]*x[i,j] } -> min ;
+
+constraints:
+	{ i in machines:  sos_m[i]: sum{ j in (combinations *> [i,*])  : x[i,j] } = 1; }
+	{ j in locations: sos_l[j]: sum{ i in (combinations *> [*,j])  : x[i,j] } <= 1; }

@@ -893,7 +893,10 @@ class Cmpl(threading.Thread):
             shutil.copyfile(self.__model, self.__cmplFile)
             
             try:
-                cmplBin = os.environ['CMPLBINARY']
+                cmplBin = os.environ['CMPLHOME'] + 'bin'+ os.sep +"cmpl"
+                if sys.platform.startswith('win'):
+                    cmplBin+=".exe"
+                
                 if not os.path.exists(cmplBin):
                     raise CmplException("Can't find Cmpl binary: " + cmplBin)
             except:
@@ -1214,7 +1217,9 @@ class Cmpl(threading.Thread):
                 solFile = solFileName
 
             if not self.__remoteMode:
-                self.__solutionString = self.__solutions.solFileContent
+                pos1=self.__solutions.solFileContent.find('<instanceName>')+len('<instanceName>')
+                pos2=self.__solutions.solFileContent.find('</instanceName>')
+                self.__solutionString = self.__solutions.solFileContent[:pos1] + self.__problem + ".cmpl" + self.__solutions.solFileContent[pos2:]
 
             try:
                 f = open(solFile, 'w')

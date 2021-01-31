@@ -12,8 +12,8 @@ try:
 	cuttingOpt.setOption("-no-remodel")
 	#patternGen.setOption("-solver cplex")
 
-	cuttingOpt.setOutput(True)
-	patternGen.setOutput(True)
+	#cuttingOpt.setOutput(True)
+	#patternGen.setOutput(True)
 
 	#patternGen.debug(True)
 
@@ -81,7 +81,7 @@ try:
 			
 	cuttingOpt.delOption(ri)
 	
-	cuttingOpt.solve() 	#hier ist der Fehler!!!
+	cuttingOpt.solve() 	
 	cuttingOpt.varByName()
 	
 	print("Objective value: " , cuttingOpt.solution.value , "\n")
