@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of CmplServer 
  #
- #  Copyright (C) 2013, 2014
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -26,14 +26,11 @@
  #
  #**********************************************************************
 
-#!/usr/bin/python 
 
 from socketserver import ThreadingMixIn
 
-
 from xmlrpc.server import SimpleXMLRPCServer 
 from time import gmtime, strftime
-
 
 from pyCmpl.CmplDefs import *
 
@@ -64,16 +61,14 @@ class CmplServerTools(object):
 			if id==None and name==None:
 				logFile.write("[" + strftime("%Y-%m-%d %H:%M:%S", gmtime())+ "] - " + msg+"\n")
 			elif name==None:
-				#logFile.write( string.split(id,"-")[0] + " - [" + strftime("%Y-%m-%d %H:%M:%S", gmtime())+ "] - " + id + " <"+msg+">\n")
 				logFile.write( "[" + strftime("%Y-%m-%d %H:%M:%S", gmtime())+ "] - " + id + " -  <"+msg+">\n")
 			else:
-				#logFile.write( string.split(id,"-")[0] + " - [" + strftime("%Y-%m-%d %H:%M:%S", gmtime())+ "] - " + id + " - " + name + " <"+msg+">\n")
 				logFile.write(  "[" + strftime("%Y-%m-%d %H:%M:%S", gmtime())+ "] - " + id + " - " + name + " <"+msg+">\n")
 
 			logFile.flush()
 		except IOError as e:
-			pass
-			#raise Exception("IO error for solution or log file ")
+			print("IO error for solution or log file ")
+			exit()
 	#*********** end cmplLogging *******
 	
 	#*********** readFileContent **********	

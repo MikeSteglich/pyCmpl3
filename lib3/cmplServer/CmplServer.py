@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of CmplServer 
  #
- #  Copyright (C) 2013, 2014
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -26,18 +26,8 @@
  #
  #**********************************************************************
 
-
-#!/usr/bin/python 
-
-
-
-"CMPLServer and CMPLGrid"
-__author__ = "Mike Steglich"
-__copyright__ = "Copyright (C) 2013,2014, 2015, 2016, 2017, 2018 Mike Steglich"
-__license__ = "LGPLv3"
-__version__ = "1.3.3"
-
-
+__version__ = "2.0.0"
+# April 2021
 
 from pyCmpl.CmplDefs import *
 from pyCmpl.CmplInstance import *
@@ -263,7 +253,6 @@ class CmplServer(object):
 			raise CmplServerException( "Cannot read CmplServer log file <"+self.__logFile+"> " + e.strerror )
 		
 		try:
-
 			self.__optFileName=""
 			try:
 				self.__optFileName=os.environ['CMPLHOME']+'bin'+os.sep+'cmplServer.opt'	
@@ -328,7 +317,6 @@ class CmplServer(object):
 							if ans[0]==CMPLGRID_SCHEDULER_ERROR:
 								self.__serverStatus = CMPLSERVER_ERROR
 								self.__serverStatusTxt = "CmplGridScheduler error on <"+gridArgs[0] + "> "  + ans[1]
-								#self.__cmplSchedulerExecute(self.__schedulerList[s].scheduler,"disconnectServer",ans[2])
 								self.__cleanUp()
 								raise CmplServerException( "CmplServer can't connect to CmplGridScheduler <"+gridArgs[0] + "> : "  +  ans[1], self.__logFile)
 							
@@ -343,16 +331,12 @@ class CmplServer(object):
 								raise CmplServerException( "CmplServer can't connect to CmplGridScheduler <"+gridArgs[0]+"> : " + ans[1], self.__logFile)
 						else:
 						   CmplServerTools.cmplLogging( self.__logFile,  "Wrong option maxProblems <"+gridArgs[1]+"> for CmplGridScheduler <"+ gridArgs[0] + "> in CmplServer option file" )
-						   
-				
 			
 			f.close()
 			
 			if self.__serverMode==CMPL_GRID and len(self.__schedulerList)==0:
 				self.__cleanUp()
-				raise CmplServerException( "CmplServer is not connected to a CmplGridScheduler ")
-							
-				
+				raise CmplServerException( "CmplServer is not connected to a CmplGridScheduler ")					
 			
 		except IOError as e:
 			raise CmplServerException( "Cannot read CmplServer option file <"+self.__optFileName+"> " + e.strerror , self.__logFile)
@@ -386,12 +370,10 @@ class CmplServer(object):
 			self.__server.register_function(self.cancel)
 			self.__server.register_function(self.getSolutions)
 			self.__server.register_function(self.getCmplMessages)
-			self.__server.register_function(self.getCmplInfo)
 			self.__server.register_function(self.removeProblem)
 			self.__server.register_function(self.stopServer)
 			self.__server.register_function(self.status)
 			self.__server.register_function(self.disconnectFromScheduler)
-			
 			
 			logMsg.write("CmplServer has been started")
 			if self.__serverMode==CMPL_GRID:
@@ -399,19 +381,16 @@ class CmplServer(object):
 			logMsg.write(" | port: "  + str(self.__cmplPort) + " | maxProblems: " + str(self.__maxProblems ) + " | maxInactivityTime: " + str(self.__maxInactivityTime) + " | serviceIntervall: " + str(self.__serviceIntervall))
 			logMsg.write(" | solvers: " + str(self.__solvers))
 			CmplServerTools.cmplLogging( self.__logFile, logMsg.getvalue() )
-			
-			
+					
 			self.shutdown = False
 			_thread.start_new_thread(self.__serviceThread, () ) 
 
-			#self.__server.serve_forever()
 			while not self.shutdown:
 				self.__server.handle_request()
 		except:
 			logMsg.write("CmplServer error: " + str(sys.exc_info()[1]))
 			print("CmplServer error: " , str(sys.exc_info()[1]))
 		logMsg.close()
-			
 	#*********** end startServer **********
 	
 			
@@ -433,7 +412,7 @@ class CmplServer(object):
 		
 			if int(compatibility)!=self.__compatibility:
 				status=CMPLSERVER_ERROR
-				statusMessage="Incompatible CmplServer client with compatibility stage "+str(compatibility) + " instead of " + str(self.__compatibility)
+				statusMessage="Incompatible CmplServer client with compatibility number "+str(compatibility) + " instead of " + str(self.__compatibility)
 			else:
 				statusMessage=str(self.__compatibility)
 				
@@ -517,7 +496,6 @@ class CmplServer(object):
 	def getSolutions(self, id):
 		if self.__checkId(id):
 			try:
-				
 				problem =  os.path.splitext(self.__cmplServerPath+id+os.sep+self.__problemList[id].name)[0]
 				cmplSolFile = problem+".csol"
 			
@@ -531,7 +509,6 @@ class CmplServer(object):
 				self.__problemList[id].setStatus(CMPLSERVER_ERROR)
 				self.__problemList[id].setStatusMessage("No solution found")
 				solStr=""
-				
 				
 			CmplServerTools.cmplLogging( self.__logFile,  "Sending solution(s)" , id, self.__problemList[id].name)
 			self.__problemList[id].setLastActivityTime(time.time())	
@@ -571,49 +548,16 @@ class CmplServer(object):
 			msgStr=""
 		return [ status, statusMessage, msgStr]
 	#*********** end getCmplMessages ********
-	
-	#*********** getCmplInfo ****************
-	def getCmplInfo(self, id):
-		if self.__checkId(id):
-			try:
-				problem =  os.path.splitext(self.__cmplServerPath+id+os.sep+self.__problemList[id].name)[0]
-				cmplInfoFile = problem+".cinf"
-					
-				msgStr=""
-				#CmplServerTools.cmplLogging( self.__logFile,  "D1", id, self.__problemList[id].name )
-				if not (self.__problemList[id].status==CMPLSERVER_ERROR or self.__problemList[id].status==CMPL_FAILED) :
-					msgStr = CmplServerTools.readFileContent(cmplInfoFile)
-					#CmplServerTools.cmplLogging( self.__logFile,  "D2", id, self.__problemList[id].name )
-				
-			except:
-				self.__problemList[id].setStatus(CMPLSERVER_ERROR)
-				self.__problemList[id].setStatusMessage("Cannot read CmplInfo file")
 			
-			CmplServerTools.cmplLogging( self.__logFile,  "Sending cmplInfos", id, self.__problemList[id].name )
-			self.__problemList[id].setLastActivityTime(time.time())		
-			
-			status=self.__problemList[id].status
-			statusMessage=self.__problemList[id].statusMessage
-
-			
-
-		else:
-			status = CMPLSERVER_ERROR
-			statusMessage = "Sending cmplInfo file failed -> unknown id " + id
-			msgStr=""
-			
-		return [ status, statusMessage, msgStr]
-	#*********** end getCmplInfo *************
-		
 	#*********** send ********************	
 	def send(self, instanceStr):
-			
 		status=CMPLSERVER_OK
 		statusMessage=""
 			
 		try:
 			inst = CmplInstance()
 			inst.writeCmplInstance(self.__cmplServerPath, instanceStr)	
+			CmplServerTools.cmplLogging( self.__logFile,  "CmplInstance has been written" , inst.jobId, self.__problemList[inst.jobId].name)
 		except CmplException as e:
 			status=CMPLSERVER_ERROR
 			statusMessage=e.msg
@@ -636,7 +580,7 @@ class CmplServer(object):
 					self.__problemList[inst.jobId].setOutput("CmplServer - To many parallel problems - Problem has been moved to the problem queue.") 
 
 				else:
-					self.__runSolver(inst.jobId)
+					self.__runCmpl(inst.jobId)
 
 					status=self.__problemList[inst.jobId].status
 					statusMessage=self.__problemList[inst.jobId].statusMessage
@@ -673,7 +617,6 @@ class CmplServer(object):
 					
 					if ret != 0 or not os.path.isfile(cmplMsgFile):
 						self.__problemList[id].setStatus(CMPL_FAILED)
-						#self.__problemList[id].setStatus(CMPLSERVER_ERROR)
 						ant = self.__problemList[id].processHandler.stderr.read()
 						if type(ant)==bytes:
 							ant=ant.decode("utf-8")
@@ -691,7 +634,6 @@ class CmplServer(object):
 			status=self.__problemList[id].status
 			statusMessage=self.__problemList[id].statusMessage
 			self.__problemList[id].setLastActivityTime(time.time())
-			
 			
 		else:
 			status = CMPLSERVER_ERROR
@@ -763,10 +705,8 @@ class CmplServer(object):
 	
 	#*********** status ***************
 	def status(self):
-		#CmplServerTools.cmplLogging( self.__logFile,  "Status check: " + str(self.__serverStatus)  )
 		emptyProbs=0
 		if self.__runningProblems < self.__maxProblems:
-			#emptyProbs=int(self.__runningProblems/len(self.__schedulerList))
 			emptyProbs=self.__maxProblems-self.__runningProblems
 		
 		return [self.__serverStatus, self.__serverStatusTxt, emptyProbs]
@@ -792,7 +732,6 @@ class CmplServer(object):
 	
 	#*********** cleanUp ************
 	def __cleanUp(self ):
-	
 		if self.__serverMode==CMPL_GRID:
 			for s in self.__schedulerList:
 				try:
@@ -808,8 +747,6 @@ class CmplServer(object):
 		
 		if self.__serviceThreadHandler!=None:
 			self.__serviceThreadHandler.kill()
-	
-		#self.__logFile.close()
 	#*********** end cleanUp ********	
 	
 	#*********** __checkId ***************
@@ -843,7 +780,6 @@ class CmplServer(object):
 						CmplServerTools.cmplLogging( self.__logFile,  "CmplServer is not longer connected to a CmplGridScheduler and does not handle waiting problems." )
 						self.__shutDown=True
 						self.stopServer()
-				
 	#******* end __serviceThread ******
 		
 	#*********** cmplSchedulerExecute *******
@@ -867,7 +803,6 @@ class CmplServer(object):
 				else:	
 					continue		
 			break
-			
 		return ret
 	#******** end cmplSchedulerExecute *******
 	
@@ -900,8 +835,7 @@ class CmplServer(object):
 					
 			del self.__problemList[id]
 	#******* end __cleanOldProblems ******
-	
-	
+		
 	#*********** __storeOutput *****************
 	def __storeOutput(self, id):
 		try:
@@ -925,19 +859,17 @@ class CmplServer(object):
 	
 	#*********** __handleProblemQueue *****************
 	def __handleProblemQueue(self, id):
-		
 		self.__runningProblems-=1
 		
 		if len(self.__problemQueue)>0:
 			tmpId=self.__problemQueue.pop(0)
-			self.__runSolver(tmpId)
+			self.__runCmpl(tmpId)
 			
 			if  self.__problemList[tmpId].status==CMPLSERVER_ERROR or self.__problemList[tmpId].status==CMPL_FAILED:
 				CmplServerTools.cmplLogging( self.__logFile,  "Solving problem failed: " + self.__problemList[tmpId].setStatusMessage , tmpId,  self.__problemList[tmpId].name)
 				self.__problemQueue.insert(0,tmpId)	
 		else:
 			self.__addEmptyProblemToGrid(id)
-					
 	#*********** end __handleProblemQueue *************
 	
 	#*********** __addEmptyProblemToGrid *****************
@@ -952,8 +884,7 @@ class CmplServer(object):
 	#*********** end __addEmptyProblemToGrid ***************
 	
 	#*********** runSolver ***************	
-	def __runSolver(self, id):	
-		
+	def __runCmpl(self, id):	
 		ret=True
 			
 		if self.__checkId(id):
@@ -973,33 +904,24 @@ class CmplServer(object):
 					self.__problemList[id].setStatusMessage("Cant't find Cmpl binary: " + cmplBin)
 					ret = False
 				else:
-					problem = self.__cmplServerPath+id+os.sep+self.__problemList[id].name
-
-					if self.__compatibility>2:
-						cmdList = [cmplBin, problem, "-config", ".modules-server", "-cmsg", "-solution"]
-					else:
-						cmdList = [cmplBin, problem, "-remote", "-e", "-includesForbidden"]
-						
+					os.chdir( self.__cmplServerPath+id)
+	
+					cmdList = [cmplBin, "-config", ".modules-server", "-cmsg", "-solution", "-silent-start"]
+					
 					if len(self.__problemList[id].options) != 0:
-
-						if self.__compatibility>2:
-							for opt in self.__problemList[id].options:
-								CmplServerTools.cmplLogging( self.__logFile, str(opt)+" "+str(type(opt)));
-								tmpOpt = opt.split()
-								for o in tmpOpt:
-									cmdList.append(o)
-						else: 
-							for opt in self.__problemList[id].options:
-								cmdList.append("-headerOpt")
-								cmdList.append(opt.replace(" ", "#"))
-
-					CmplServerTools.cmplLogging( self.__logFile, str(cmdList));
+						for opt in self.__problemList[id].options:
+							#CmplServerTools.cmplLogging( self.__logFile, str(opt)+" "+str(type(opt)))
+							tmpOpt = opt.split()
+							for o in tmpOpt:
+								cmdList.append(o)
+				
 					pHandler = subprocess.Popen(cmdList, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 					self.__problemList[id].setProcessHandler( pHandler )
 					self.__problemList[id].setStatus(PROBLEM_RUNNING)
 
 					self.__problemList[id].setLastActivityTime(time.time())
-					CmplServerTools.cmplLogging( self.__logFile,  "Solving problem has been started" , id, self.__problemList[id].name)	
+					CmplServerTools.cmplLogging( self.__logFile,  "Solving problem has been started"  , id, self.__problemList[id].name)	
+					#CmplServerTools.cmplLogging( self.__logFile, "with options: "+str(cmdList[1:]))
 					self.__problemList[id].setOutput("CmplServer - Solving problem has been started") 
 	
 					_thread.start_new_thread(self.__storeOutput, (id,)) 
@@ -1012,7 +934,7 @@ class CmplServer(object):
 	
 			
 		return ret 
-	#*********** end __runSolver ************
+	#*********** end __runCmpl ************
 	
 
 

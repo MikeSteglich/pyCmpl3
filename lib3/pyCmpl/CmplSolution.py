@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of pyCMPL 
  #
- #  Copyright (C) 2013
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -25,8 +25,6 @@
  #  along with this program; if not, see <http://www.gnu.org/licenses/>.
  #
  #**********************************************************************
-
-#!/usr/bin/python 
 
 import os
 import re
@@ -292,13 +290,11 @@ class CmplSolutions(object):
 			else:
 				x.setUpperBound(float(tmpList[5]))
 
-		#if tmpList[6]=='-':
 		if tmpList[6]=='NaN' or tmpList[6]=='-':
 			x.setMarginal(float('NaN'))
 		else: 
 			x.setMarginal(float(tmpList[6]))
 		return x
-	
 	#*********** end readSolLine *********	
 	
 	
@@ -317,7 +313,7 @@ class CmplSolutions(object):
 				solStr = f.read()
 				f.close()
 			except IOError as e:
-				raise CmplServerException("IO error for solution file ")
+				raise CmplException("IO error for solution file ")
 		
 		lines = io.StringIO(solStr) 
 		
@@ -394,16 +390,6 @@ class CmplSolutions(object):
 				if "<constraintsDisplayOptions" in line:
 					self.__conDisplayOptions = re.findall("<constraintsDisplayOptions>([^\"]*)</constraintsDisplayOptions>", line)[0]
 					continue
-				if "<asciiSolFile" in line:
-					self.__asciiSolFile = re.findall("<asciiSolFile>([^\"]*)</asciiSolFile>", line)[0]
-					continue
-				if "<csvSolFile" in line:
-					self.__csvSolFile = re.findall("<csvSolFile>([^\"]*)</csvSolFile>", line)[0]
-					continue
-				if "<cmplSolFile" in line:
-					self.__cmplSolFile = re.findall("<cmplSolFile>([^\"]*)</cmplSolFile>", line)[0]
-					continue	
-				
 			
 			if solutionSection:
 				if "<variables>" in line:

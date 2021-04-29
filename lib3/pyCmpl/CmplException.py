@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of pyCMPL 
  #
- #  Copyright (C) 2013
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -26,10 +26,6 @@
  #
  #**********************************************************************
 
-#!/usr/bin/python 
-
-#from .CmplMsg import *
-#from html.parser import HTMLParser
 import html
 
 from io import StringIO
@@ -43,8 +39,8 @@ class CmplException(Exception):
 		if type(msg) == bytes:
 			msg = msg.decode("utf-8")
 
-		if not "pyCmpl error:" in msg:
-			self.__msgStr.write("pyCmpl error: " +msg)
+		if not "ERROR:" in msg:
+			self.__msgStr.write("ERROR: " +msg)
 		else:	
 			self.__msgStr.write(msg)
 		
@@ -53,7 +49,7 @@ class CmplException(Exception):
 				self.__msgStr.write("\n" + m.type + " in module <" + m.module + "> at location <" + m.location + "> " + html.unescape(m.description))
 	
 	def __str__(self):
-		return "pyCmpl error:"
+		return "ERROR:"
 	
 	def __del__(self):
 		self.__msgStr.close()

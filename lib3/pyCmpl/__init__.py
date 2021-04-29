@@ -7,7 +7,9 @@ from .CmplSolution import *
 from .CmplSet import *
 from .CmplParameter import *
 from .CmplInstance import *
-from .CmplInfo import *
+from .CmplXlsData import *
+from .CmplArgs import *
+from .CmplSolutionReport import *
 
 
 	

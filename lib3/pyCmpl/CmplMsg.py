@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of pyCMPL 
  #
- #  Copyright (C) 2013
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -25,9 +25,6 @@
  #  along with this program; if not, see <http://www.gnu.org/licenses/>.
  #
  #**********************************************************************
-
-#!/usr/bin/python 
-
 
 import os
 import re
@@ -69,13 +66,6 @@ class CmplMsg(object):
 
 	def setModule(self,mod):
 		self.__module=mod
-
-	#@property
-	#def line(self):
-	#	return self.__line
-		
-	#def setLine(self, line):
-	#	self.__line=line
 		
 	@property
 	def description(self):
@@ -94,10 +84,12 @@ class CmplMessages(object):
 
 	def __init__(self, msgFile=None):
 		self.__cmplStatus = ""
+		self.__instance = ""
 		self.__cmplVersion = ""
 		self.__cmplMessage = ""
 		self.__msgFile = msgFile
 		self.__cmplMessageList = []
+		self.__nrOfMessages = 0
 		
 	#*********** cmplStatus ********	
 	@property
@@ -140,9 +132,7 @@ class CmplMessages(object):
 				msgStr = f.read()
 				f.close()
 			except IOError:
-				raise CmplException("IO error for instance file ")
-				#raise CmplServerException("IO error for instance file ")
-				
+				raise CmplException("IO error for CmplMessage file ")	
 				
 		lines = io.StringIO(msgStr) 
 		
@@ -184,6 +174,11 @@ class CmplMessages(object):
 				if "<generalStatus" in line:
 					self.__cmplStatus = re.findall("<generalStatus>([^\"]*)</generalStatus>", line)[0]
 					continue
+				if "<instanceName" in line:
+					self.__instance = re.findall("<instanceName>([^\"]*)</instanceName>", line)[0]
+					path,name=os.path.split(self.__instance)
+					self.__instance=name
+
 				if "<message" in line:
 					self.__cmplMessage = re.findall("<message>([^\"]*)</message>", line)[0]
 					continue
@@ -200,23 +195,53 @@ class CmplMessages(object):
 					x.setModule(tmpList[1])
 
 					tmpLocation=""
-					tmpLoc=re.findall('cmpl__[0-9]{6}__(.*).cmpl(.*)',tmpList[2])
+					path,name=os.path.split(tmpList[2])
+
+					tmpLoc=re.findall('(.*)_cmpl__(.*).cmpl(.*)',tmpList[2])
 					if len(tmpLoc)>0:
-						tmpLocation=tmpLoc[0][0]+".cmpl"+tmpLoc[0][1]
+						tmpLocation=tmpLoc[0][0]+".cmpl"+tmpLoc[0][0]
 					else:
 						tmpLocation=tmpList[2]
-
-					x.setLocation(tmpLocation)
-
-					x.setDescription(unescape(tmpList[3]))
+					
+					path,name=os.path.split(tmpLocation)
+					x.setLocation(name)
+		
+					x.setDescription( unescape(tmpList[3] , entities={ "&apos;":"'"} ) )
 					self.__cmplMessageList.append(x)
 
+		self.__nrOfMessages= len(self.__cmplMessageList)
 						
 							
 	#*********** end readCmplMessages ****	
 		
 	
+	#*********** writeCmplMessages ********	
+	def writeCmplMessages(self, fileName):
+		try:	
+			f = open(fileName, "w")
+			f.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"+os.linesep)
+			f.write("<CmplMessages version=\"1.1\">"+os.linesep)
+			f.write("	<general>"+os.linesep)
+			f.write("		<instanceName>"+self.__instance+"</instanceName>"+os.linesep)
+			f.write("		<generalStatus>"+self.__cmplStatus+"</generalStatus>"+os.linesep)
+			f.write("		<message>"+self.__cmplMessage+"</message>"+os.linesep)
+			f.write("		<cmplVersion>"+self.__cmplVersion+"</cmplVersion>"+os.linesep)
+			f.write("	</general>"+os.linesep)
 
+			if self.__nrOfMessages>0:
+				f.write("	<messages numberOfMessages=\""+str(self.__nrOfMessages)+"\">"+os.linesep)
+
+				for m in self.__cmplMessageList:
+					f.write("		<message type =\""+m.type+"\" module=\""+m.module+"\" location=\""+m.location+"\" description=\""+m.description+"\"/>"+ os.linesep)
+
+				f.write("	</messages>"+os.linesep)
+			
+			f.write("</CmplMessages>"+os.linesep)
+
+			f.close()
+		except IOError:
+			raise CmplException("IO error for CmplMessage file ")
+	#*********** end writeCmplMessages ********	
 		
 		
 		

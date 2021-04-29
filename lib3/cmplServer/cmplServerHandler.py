@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of CmplServer 
  #
- #  Copyright (C) 2013, 2014
+ #  Copyright (C)
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -26,21 +26,14 @@
  #
  #**********************************************************************
 
-
-#!/usr/bin/python 
-
 import sys
 import os
 
 from cmplServer import *
 from pyCmpl.CmplDefs import *
 
-#************* end pyCmpl and cmplserver includes ****************
-
-
 import xmlrpc.client
 import socket
-
 
 #*********** startServer *************	
 def startCmplServer(port, mode):

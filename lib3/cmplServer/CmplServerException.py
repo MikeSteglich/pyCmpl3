@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of pyCMPL 
  #
- #  Copyright (C) 2013
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -26,8 +26,6 @@
  #
  #**********************************************************************
 
-#!/usr/bin/python 
-
 from .CmplServerTools import *
 import io
 
@@ -44,7 +42,6 @@ class CmplServerException(Exception):
 	
 		if logFile != None:
 			CmplServerTools.cmplLogging( logFile,  msg )
-		
 					
 	def __str__(self):
 		return "CmplServer error:"

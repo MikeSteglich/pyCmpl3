@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of CmplServer 
  #
- #  Copyright (C) 2013, 2014
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -25,11 +25,6 @@
  #  along with this program; if not, see <http://www.gnu.org/licenses/>.
  #
  #**********************************************************************
-
-
-#!/usr/bin/python 
-
-
 
 from pyCmpl.CmplDefs import *
 from pyCmpl.CmplTools import *
@@ -166,7 +161,7 @@ class ProblemQueueHandler(object):
 		return self.__cmplName
 		
 	def setCmplName(self, name):
-		self.__cmplName = url	
+		self.__cmplName = name	
 		
 	@property
 	def status(self):
@@ -283,8 +278,6 @@ class CmplGridScheduler(object):
 					else:
 						CmplServerTools.cmplLogging( self.__logFile,  "Wrong maxServerTries in CmplServer option file <"+str(self.__maxServerTries)+"> default value is used" )
 						
-				"""if ret[0].strip().lower() == "solvers":
-					self.__solvers=ret[1].split()"""
 					
 			f.close()
 		
@@ -393,8 +386,6 @@ class CmplGridScheduler(object):
 				elif status==CMPLGRID_SCHEDULER_OK: 	
 					if self.__sendProblemToServer( bestServer, id, cmplName):
 						statusMessage = self.__serverList[bestServer].cmplServerUrl
-						
-			
 					
 		return [ status, statusMessage, id]
 	#*********** end getJobId ************		
@@ -428,16 +419,13 @@ class CmplGridScheduler(object):
 		else: 
 			status = CMPLGRID_SCHEDULER_ERROR
 			statusMessage = "Problem is not connected to CMPLGrid <"+id+">"
-		
 			
 		return [status, statusMessage, id ]
-	
 	#*********** end knock **************	
 	
 	
 	#*********** cmplServerFailed **************		
 	def cmplServerFailed(self, cmplUrl):
-	
 		status=CMPLGRID_SCHEDULER_WARNING
 		statusMessage="Unknown CmplServer can't registred as inactive <"+cmplUrl+">"
 	
@@ -450,12 +438,10 @@ class CmplGridScheduler(object):
 		CmplServerTools.cmplLogging( self.__logFile,  statusMessage )
 			
 		return [status, statusMessage, "" ]
-	
 	#*********** end cmplServerFailed **************				
 		
 	#*********** getServerId **************		
 	def getServerId(self, port, maxProblems, performanceIndex, solvers, compatibility=0):
-	
 		tmpUrl = self.__server.client_address[0]+":"+str(port)
 		id = tmpUrl + "-"+ str(random.randint(100000, 999999))
 			
@@ -472,7 +458,7 @@ class CmplGridScheduler(object):
 			
 			if 	int(compatibility)!=self.__compatibility:
 				status= CMPLGRID_SCHEDULER_ERROR
-				statusMessage = "Incompatible CmplServer with compatibilty stage "+str(compatibility) + " instead of " + str(self.__compatibility)
+				statusMessage = "Incompatible CmplServer with compatibilty number "+str(compatibility) + " instead of " + str(self.__compatibility)
 			else:
 				statusMessage = str(self.__compatibility)
 				
@@ -489,8 +475,7 @@ class CmplGridScheduler(object):
 				
 			if status == CMPLGRID_SCHEDULER_OK:
 				CmplServerTools.cmplLogging( self.__logFile,   "CmplServer has been connected: solver "+str(self.__serverList[id].solvers)+" : maxProblems :" + str(self.__serverList[id].emptyProblems) + ">" , id )
-	
-	
+		
 		return [ status, statusMessage, id]
 	#*********** end getServerId ************	
 	
@@ -510,7 +495,6 @@ class CmplGridScheduler(object):
 			statusMessage = "Server isn't connected"
 		
 		return [status, statusMessage, "" ]
-	
 	#*********** end addEmptyProblem **************		
 	
 		
@@ -529,7 +513,6 @@ class CmplGridScheduler(object):
 			statusMessage = "CmplServer <" + id +"> wasn't connected"
 			
 		return [ status, statusMessage, ""]
-	
 	#*********** end disconnectServer ************	
 	
 
@@ -548,7 +531,6 @@ class CmplGridScheduler(object):
 			statusMessage = "Problem <" + id +"> wasn't connected"
 			
 		return [ status, statusMessage, ""]
-	
 	#*********** end disconnectProblem ************	
 	
 	
@@ -604,12 +586,10 @@ class CmplGridScheduler(object):
 	
 	#*********** __serviceThread ******
 	def __serviceThread(self):
-		
 		lastActivityTime=time.time()
 		status = CMPLGRID_SCHEDULER_OK
 		
-		while True:
-			
+		while True:		
 			ret=[]
 			if self.shutdown==True:
 				break
@@ -720,7 +700,6 @@ class CmplGridScheduler(object):
 		else: 
 			CmplServerTools.cmplLogging( self.__logFile,  "Problem has been sent to CmplServer <"+ bestServer +"> " , id, cmplName )
 			ans=True
-	
 		return ans
 	#*********** end __sendProblemToServer ************	
 	

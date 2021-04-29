@@ -26,16 +26,8 @@
 #
 # **********************************************************************
 
-# !/usr/bin/python
-
-
-"pyCmpl - CMPL's python API "
-__author__ = "Mike Steglich"
-__copyright__ = "Copyright (C) Mike Steglich"
-__license__ = "LGPLv3"
 __version__ = "2.0.0"
-# Feb 2020
-
+# April 2021
 
 from math import *
 import os
@@ -51,8 +43,9 @@ import tempfile
 import io
 import pickle
 import traceback
-import tempfile
 import shutil
+import collections
+import re 
 
 
 from .CmplDefs import *
@@ -63,7 +56,9 @@ from .CmplSolution import *
 from .CmplSet import *
 from .CmplParameter import *
 from .CmplInstance import *
-from .CmplInfo import *
+from .CmplXlsData import *
+from .CmplArgs import *
+from .CmplSolutionReport import *
 
 
 #################################################################################
@@ -80,29 +75,36 @@ class Cmpl(threading.Thread):
     # ********************************************************************************
 
     # *********** constructor **********
-    def __init__(self, model):
+    def __init__(self, model, cmplArgs=None):
 
         threading.Thread.__init__(self)
 
         self.__compatibility = COMPATIBILITY
 
-        self.__problem = ""
+        if type(model) != str:
+            raise CmplException(str(model) + " is not a valid file name for a Cmpl file")
+        
+        self.__cmplFile = model
+        self.__cmplFileAlias = None
+        
+        if not os.path.exists(model):
+            raise CmplException("CMPL file " + model + " does not exist."  )
+
+        self.__baseName = os.path.splitext(self.__cmplFile)[0]
+
         self.__cmplDataStr = io.StringIO()
 
         self.__setList = []
         self.__parameterList = []
         self.__optionsList = {}
 
+        self.__xlsData = None
+        self.__isXlsData = False
+        self.__xlsDataFile = ""
+
         self.__status = None
         self.__solutions = None
         self.__solutionString = ""
-        self.__cmplMessageString = ""
-
-        self.__cmplInfos = None
-        self.__cmplInfoString = ""
-
-        self.__cmplFileList = []
-        self.__dataFileList = []
 
         self.__remoteMode = False
         self.__remoteStatus = CMPL_UNKNOWN
@@ -110,6 +112,7 @@ class Cmpl(threading.Thread):
 
         self.__jobId = ""
         self.__instStr = ""
+        self.__cmplInstance = None
 
         self.__solver = "cbc"
 
@@ -119,236 +122,191 @@ class Cmpl(threading.Thread):
         self.__cmplGridSchedulerUrl = ""
         self.__serverMode = SERVER_UNKNOWN
 
-        self.__asyncMode = 0
+        self.__runMode = PYCMPL
 
         self.__cmplServerRunning = False
 
         self.__maxCmplServerTries = 10
         self.__maxCmplServerQueuingTime = 5 * 60  # in seconds
 
-        self.__cmplFile = None
         self.__cmplDataFile = None
         self.__cmplMsgFile = None
-        self.__cmplSolFile = None
+        self.__cmplSolFile = None     
 
-        self.__cmplProc = None
-
-        self.__refreshTime = 0.5
+        self.__refreshTime = 0.1
         self.__printOutput = False
-        self.__stringOutput = False
-        self.__outputString = io.StringIO()
 
         self.__isCleaned = False
         self.__debug = False
 
-        self.__cmplInstance = None
+        self.__cmplBinHandler = None
+        self.__cmplBinName=""
 
-        if type(model) != str:
-            raise CmplException(str(model) + " is not a valid file name for a Cmpl file")
+        try:
+            self.__cmplBinName = os.environ['CMPLHOME'] + 'bin'+ os.sep +"cmpl"
+            if sys.platform.startswith('win'):
+                self.__cmplBinName+=".exe"
+        except:
+            raise CmplException("Environment variable CMPLHOME not defined")
+
+        if not os.path.exists(self.__cmplBinName):
+            raise CmplException("Can't find Cmpl binary: " + cmplBin)
+
+        if cmplArgs:
+            self.__cmplArgs = cmplArgs
+            self.__runMode = self.__cmplArgs.runMode
         else:
-            self.__model = model
+            self.__preCompAlias = "cmpl__"+next(tempfile._get_candidate_names())+"__"
+            self.__cmplArgs = CmplArgs(self.__preCompAlias+".optcmpl")
+            self.__cmplArgs.setRunMode(PYCMPL)
 
-        self.__modelDef = None
-
-        if not os.path.isfile(model):
-            raise CmplException("CMPL file " + model + " does not exist."  )
-
-        #self.__id = str(random.randint(100000, 999999))
-
-        #self.__id = next(tempfile._get_candidate_names())
-        self.__id = None
-
-
-        self.__outputLeadString = os.path.basename(os.path.splitext(self.__model)[0]) + "> "
+        self.__solReport = None
+        
+        self.__outputLeadString = os.path.basename(os.path.splitext(self.__cmplFile)[0]) + "> "
 
     # *********** end constructor ********
 
     # *********** destructor *************
     def __del__(self):
-        if self.__asyncMode == 0 or self.__asyncMode == 3:
+        if self.__runMode in (PYCMPL, CMPL_LOCAL, CMPL_REMOTE_SOLVE, CMPL_REMOTE_RETRIEVE):
             try:
                 self.__cleanUp()
-                self.__outputString.close()
+                #self.__outputString.close()
                 self.__cmplDataStr.close()
             except:
                 pass
-
     # *********** end destructor *********
 
     # *********** reduce *****************
     def __reduce__(self):
-        return (self.__class__, (self.__model,))
-
+        return (self.__class__, (self.__cmplFile,))
     # *********** end reduce *************
 
     # ********************************************************************************
     # public methods
     # ********************************************************************************
 
+    #******************** dump **********************
     def dump(self, name=None):
-
         try:
-            if name is not  None:
+            if name is not None:
                 _dumpFileName = name
             else:
-                _dumpFileName = tempfile.gettempdir() + os.sep + os.path.basename(self.__model) + ".dump"
+                _dumpFileName = tempfile.gettempdir() + os.sep + os.path.basename(self.__cmplFile) + ".dump"
+           
             _dumpFile = open(_dumpFileName, 'wb')
 
             pickle.dump(self.__compatibility, _dumpFile)
-            pickle.dump(self.__problem, _dumpFile)
-            # pickle.dump(self.__cmplDataStr,_dumpFile)
+            pickle.dump(self.__baseName, _dumpFile)
             pickle.dump(self.__setList, _dumpFile)
             pickle.dump(self.__parameterList, _dumpFile)
             pickle.dump(self.__optionsList, _dumpFile)
             pickle.dump(self.__status, _dumpFile)
+            pickle.dump(self.__isXlsData, _dumpFile)
+            pickle.dump(self.__xlsDataFile, _dumpFile)
             pickle.dump(self.__solutions, _dumpFile)
             pickle.dump(self.__solutionString, _dumpFile)
-            pickle.dump(self.__cmplMessageString, _dumpFile)
-            pickle.dump(self.__cmplInfos, _dumpFile)
-            pickle.dump(self.__cmplInfoString, _dumpFile)
-            pickle.dump(self.__cmplFileList, _dumpFile)
-            pickle.dump(self.__dataFileList, _dumpFile)
             pickle.dump(self.__remoteMode, _dumpFile)
             pickle.dump(self.__remoteStatus, _dumpFile)
             pickle.dump(self.__remoteStatusMessage, _dumpFile)
             pickle.dump(self.__jobId, _dumpFile)
             pickle.dump(self.__instStr, _dumpFile)
             pickle.dump(self.__solver, _dumpFile)
-            # pickle.dump(self.__cmplServer ,_dumpFile)
             pickle.dump(self.__cmplUrl, _dumpFile)
-            # pickle.dump(self.__cmplGridScheduler ,_dumpFile)
             pickle.dump(self.__cmplGridSchedulerUrl, _dumpFile)
             pickle.dump(self.__serverMode, _dumpFile)
-            pickle.dump(self.__asyncMode, _dumpFile)
+            pickle.dump(self.__runMode, _dumpFile)
             pickle.dump(self.__cmplServerRunning, _dumpFile)
             pickle.dump(self.__maxCmplServerTries, _dumpFile)
             pickle.dump(self.__maxCmplServerQueuingTime, _dumpFile)
             pickle.dump(self.__cmplDataFile, _dumpFile)
             pickle.dump(self.__cmplMsgFile, _dumpFile)
             pickle.dump(self.__cmplSolFile, _dumpFile)
-            pickle.dump(self.__cmplProc, _dumpFile)
+            pickle.dump(self.__cmplBinHandler, _dumpFile)
             pickle.dump(self.__refreshTime, _dumpFile)
             pickle.dump(self.__printOutput, _dumpFile)
-            pickle.dump(self.__stringOutput, _dumpFile)
-            # pickle.dump(self.__outputString,_dumpFile)
             pickle.dump(self.__isCleaned, _dumpFile)
             pickle.dump(self.__debug, _dumpFile)
-            pickle.dump(self.__model, _dumpFile)
-            pickle.dump(self.__modelDef, _dumpFile)
-            pickle.dump(self.__id, _dumpFile)
+            pickle.dump(self.__cmplFile, _dumpFile)
             pickle.dump(self.__outputLeadString, _dumpFile)
 
             _dumpFile.close()
-
         except:
             traceback.print_exc(file=sys.stdout)
             raise CmplException("Internal error, cannot write dump: " + str(sys.exc_info()[1]))
-
+    #******************** end dump **********************
+    
+    #******************** load **********************
     def load(self, name=None):
-
         try:
             if name is not None:
                 _dumpFileName = name
             else:
-                _dumpFileName = tempfile.gettempdir() + os.sep + os.path.basename(self.__model) + ".dump"
+                _dumpFileName = tempfile.gettempdir() + os.sep + os.path.basename(self.__cmplFile) + ".dump"
 
             _dumpFile = open(_dumpFileName, 'rb')
 
             self.__compatibility = pickle.load(_dumpFile)
-
-            self.__problem = pickle.load(_dumpFile)
-            # self.__cmplDataStr = pickle.load(_dumpFileName)
-
+            self.__baseName = pickle.load(_dumpFile)
             self.__setList = pickle.load(_dumpFile)
             self.__parameterList = pickle.load(_dumpFile)
             self.__optionsList = pickle.load(_dumpFile)
-
             self.__status = pickle.load(_dumpFile)
+            self.__isXlsData = pickle.load(_dumpFile)
+            self.__xlsDataFile = pickle.load(_dumpFile)
             self.__solutions = pickle.load(_dumpFile)
             self.__solutionString = pickle.load(_dumpFile)
-            self.__cmplMessageString = pickle.load(_dumpFile)
-
-            self.__cmplInfos = pickle.load(_dumpFile)
-            self.__cmplInfoString = pickle.load(_dumpFile)
-
-            self.__cmplFileList = pickle.load(_dumpFile)
-            self.__dataFileList = pickle.load(_dumpFile)
-
             self.__remoteMode = pickle.load(_dumpFile)
             self.__remoteStatus = pickle.load(_dumpFile)
             self.__remoteStatusMessage = pickle.load(_dumpFile)
-
             self.__jobId = pickle.load(_dumpFile)
             self.__instStr = pickle.load(_dumpFile)
-
             self.__solver = pickle.load(_dumpFile)
-
-            # self.__cmplServer = pickle.load(_dumpFileName)
             self.__cmplUrl = pickle.load(_dumpFile)
-            # self.__cmplGridScheduler = pickle.load(_dumpFileName)
             self.__cmplGridSchedulerUrl = pickle.load(_dumpFile)
             self.__serverMode = pickle.load(_dumpFile)
 
             if self.__serverMode == STANDALONE_SERVER:
                 if self.__cmplUrl:
                     self.__cmplServer = xmlrpc.client.ServerProxy(self.__cmplUrl)
-
             if self.__serverMode == CMPL_GRID:
                 if self.__cmplUrl:
                     self.__cmplServer = xmlrpc.client.ServerProxy(self.__cmplUrl, allow_none=False)
-
                 if self.__cmplGridSchedulerUrl:
                     self.__cmplGridScheduler = xmlrpc.client.ServerProxy(self.__cmplGridSchedulerUrl)
 
-            self.__asyncMode = pickle.load(_dumpFile)
-
+            self.__runMode = pickle.load(_dumpFile)
             self.__cmplServerRunning = pickle.load(_dumpFile)
-
             self.__maxCmplServerTries = pickle.load(_dumpFile)
             self.__maxCmplServerQueuingTime = pickle.load(_dumpFile)
-
             self.__cmplDataFile = pickle.load(_dumpFile)
             self.__cmplMsgFile = pickle.load(_dumpFile)
             self.__cmplSolFile = pickle.load(_dumpFile)
-
-            self.__cmplProc = pickle.load(_dumpFile)
-
+            self.__cmplBinHandler = pickle.load(_dumpFile)
             self.__refreshTime = pickle.load(_dumpFile)
             self.__printOutput = pickle.load(_dumpFile)
-            self.__stringOutput = pickle.load(_dumpFile)
-            # self.__outputString = pickle.load(_dumpFile)
-
             self.__isCleaned = pickle.load(_dumpFile)
             self.__debug = pickle.load(_dumpFile)
-
-            self.__model = pickle.load(_dumpFile)
-
-            self.__modelDef = pickle.load(_dumpFile)
-
-            self.__id = pickle.load(_dumpFile)
-
+            self.__cmplFile = pickle.load(_dumpFile)
             self.__outputLeadString = pickle.load(_dumpFile)
 
             _dumpFile.close()
 
             os.remove(_dumpFileName)
         except:
-            # traceback.print_exc(file=sys.stdout)
-            # raise CmplException("Internal error, cannot read dump: "+str(sys.exc_info()[1]))
-            raise CmplException(
-                "No CmplServer object exists. Please send your problem to a CmplServer before other actions.")
+            raise CmplException("No CmplServer object exists. Please send your problem to a CmplServer before other actions.")
 
     # *********** model (getter) *********
     @property
     def modelName(self):
-        return self.__model
+        return self.__cmplFile
 
     # *********** end model **************
 
     # *********** problem (getter) *********
     @property
     def problem(self):
-        return self.__problem
+        return self.__baseName
 
     # *********** end model **************
 
@@ -359,27 +317,13 @@ class Cmpl(threading.Thread):
 
     # *********** end refreshTime ********
 
-    # *********** output *****************
-    @property
-    def output(self):
-        return self.__outputString.getvalue()
-
-    # *********** end output  ************
-
     # *********** cmplMessages ************
     @property
     def cmplMessages(self):
         return self.__status.cmplMessageList
 
     # *********** end cmplMessages ********
-
-    # *********** cmplMessageString ************
-    @property
-    def cmplMessageString(self):
-        return self.__cmplMessageString
-
-    # *********** end cmplMessageString ********
-
+  
     # *********** solutions ***************
     @property
     def solutionPool(self):
@@ -423,17 +367,7 @@ class Cmpl(threading.Thread):
             return self.__solutions.nrOfConstraints
 
     # *********** end nrOfConstraints ***********
-
-    # *********** isIntegerProgram ***************
-    @property
-    def isIntegerProgram(self):
-        if self.__solutions is None:
-            raise CmplException("The model isn't generated yet.")
-        else:
-            return self.__solutions.isIntegerProgram
-
-    # *********** end isIntegerProgram ***********
-
+  
     # *********** objectiveName ***************
     @property
     def objectiveName(self):
@@ -503,22 +437,15 @@ class Cmpl(threading.Thread):
             return self.__solutions.conDisplayOptions
 
     # *********** end conDisplayOptions *********
-
-    @property
-    def isConnected(self):
-        return self.__remoteMode
-
-    @property
-    def cmplUrl(self):
-        return self.__cmplUrl
-
+   
     # *********** cmplStatus **************
     @property
     def cmplStatus(self):
-        if self.__remoteMode and self.__remoteStatus != CMPL_UNKNOWN:
+        '''if self.__remoteMode and self.__remoteStatus != CMPL_UNKNOWN:
             return self.__remoteStatus
         else:
-            return self.__status.cmplStatus
+        '''
+        return self.__status.cmplStatus
 
     # *********** end cmplStatus ***********
 
@@ -554,55 +481,40 @@ class Cmpl(threading.Thread):
 
     # *********** end solverStatusText ****
 
-    # *********** cmplSolFile *************
-    @property
-    def cmplSolFile(self):
-        return self.__solutions.cmplSolFile
-
-    # ********* end cmplSolFile ***********
-
-    # *********** csvSolFile **************
-    @property
-    def csvSolFile(self):
-        return self.__solutions.csvSolFile
-
-    # ********* end csvSolFile ************
-
-    # *********** asciiSolFile ************
-    @property
-    def asciiSolFile(self):
-        return self.__solutions.asciiSolFile
-
-    # ********* end asciiSolFile **********
-
     # *********** jobId *******************
     @property
     def jobId(self):
         return self.__jobId
 
+    @property
+    def isDebug(self):
+        return self.__debug
+
     # *********** end jobId **************
+    
+    # *********** setDataFile *******************
+    def setDataFile(self, dataFile):
+        self.__cmplDataFile=dataFile
+     # *********** endDataFile *******************
 
-    # *********** setModel **********
-    def setModel(self, modelDef=''):
-        self.__modelDef = modelDef
+    # *********** setXlsDataFile *******************
+    def setXlsDataFile(self, xlsDataFile):
+        self.__xlsData = CmplXlsData(xlsDataFile, self.__cmplArgs)
+        self.__xlsDataFile=xlsDataFile
+        self.__isXlsData=True
+    
+        if self.__xlsData:
+            tmpSets,tmpPars = self.__xlsData.readXlsData()
+            if tmpSets:
+                self.setSets(tmpSets)
+            if tmpPars:
+                self.setParameters(tmpPars)
+    # *********** end setXlsDataFile *******************
 
-    # *********** end setModel ******
-
-    # *********** model *******************
-    def model(self, line=None):
-        if line is None:
-            return self.__modelDef
-        else:
-            modList = self.__modelDef.split('\n')
-            if line < len(modList):
-                return self.__modelDef.split('\n')[line]
-            else:
-                return ' '
-
-    # *********** end model **************
-
-    def setAsyncMode(self, mode):
-        self.__asyncMode = mode
+    # *********** setAsyncMode *******************
+    def setRunMode(self, mode):
+        self.__runMode = mode
+    # *********** end setAsyncMode *******************
 
     # *********** setOutputPipe **********
     def setOutput(self, ok=False, lStr=None):
@@ -611,15 +523,7 @@ class Cmpl(threading.Thread):
             self.__outputLeadString = lStr
 
     # *********** end setOutputPipe ******
-
-    # *********** setOutputPipe **********
-    def setOutputToString(self, ok=False, lStr=None):
-        self.__stringOutput = ok
-        if lStr is not None:
-            self.__outputLeadString = lStr
-
-    # *********** end setOutputPipe ******
-
+  
     # *********** setRefreshTime *********
     def setRefreshTime(self, rTime):
         self.__refreshTime = rTime
@@ -679,6 +583,8 @@ class Cmpl(threading.Thread):
         if type(option) != str:
             raise CmplException(str(option) + " is not a valid CMPL option ")
         else:
+            if self.__cmplServerRunning:
+                print("Option <"+option+"> is ignored, because problem has been connected with a CMPLServer before.")
             pos = len(self.__optionsList)
             self.__optionsList.update({pos: option})
         return pos
@@ -690,6 +596,8 @@ class Cmpl(threading.Thread):
         if type(optionList) != dict:
             raise CmplException("Wrong option list ")
         else:
+            if self.__cmplServerRunning:
+                print("Options are ignored, because problem has been connected with a CMPLServer before.")
             self.__optionsList = optionList
 
     # *********** end setOption ***********
@@ -706,48 +614,42 @@ class Cmpl(threading.Thread):
     # *********** delOptions ***************
     def delOptions(self):
         self.__optionsList = {}
-
     # *********** end delOptions ***********
 
     # **** setMaxServerQueuingTime *********
     def setMaxServerQueuingTime(self, qTime):
         self.__maxCmplServerQueuingTime = qTime
-
     # ** end setMaxServerQueuingTime *******
 
     # **** maxServerQueuingTime ************
     @property
     def maxServerQueuingTime(self):
         return self.__maxCmplServerQueuingTime
-
     # ** end maxServerQueuingTime **********
 
     # **** setMaxServerTries ***************
     def setMaxServerTries(self, tries):
         self.__maxCmplServerTries = tries
-
     # ** end setMaxServerTries *************
 
     # **** maxServerTries ******************
     @property
     def maxServerTries(self):
         return self.__maxCmplServerTries
-
     # ** end maxServerTries ****************
 
     # *********** debug *******************
     def debug(self, mode=True):
         self.__debug = mode
-
     # *********** end debug ***************
 
+    ####### überprüfen ob das onsolet ist
     # *********** getVarByName ************
     def getVarByName(self, name, solNr=0):
         if solNr < 0 or solNr > self.__solutions.nrOfSolutions - 1:
             raise CmplException("Solution with index " + str(solNr) + " doesn't exist.")
         s = self.__solByNr(solNr)
         return self.__getElementByName(name, s.variables)
-
     # *********** end getVarByName ********
 
     # *********** getConByName ************
@@ -756,16 +658,15 @@ class Cmpl(threading.Thread):
             raise CmplException("Solution with index " + str(solNr) + " doesn't exist.")
         s = self.__solByNr(solNr)
         return self.__getElementByName(name, s.constraints)
-
     # *********** end getConByName ********
 
+    ##### Lassen als public wenn andere Lösungen als die erste gefragt sind
     # *********** varByName ***************
     def varByName(self, solNr=0):
         if solNr < 0 or solNr > self.__solutions.nrOfSolutions - 1:
             raise CmplException("Solution with index " + str(solNr) + " doesn't exist.")
         s = self.__solByNr(solNr)
         self.__elementByName(s.variables)
-
     # *********** end varByName ***********
 
     # *********** conByName ***************
@@ -774,20 +675,13 @@ class Cmpl(threading.Thread):
             raise CmplException("Solution with index " + str(solNr) + " doesn't exist.")
         s = self.__solByNr(solNr)
         self.__elementByName(s.constraints)
-
     # *********** end conByName ***********
 
     # *********** solve *******************
     def solve(self):
-
         self.__isCleaned=False
-        self.__id = next(tempfile._get_candidate_names())
-
-        if self.__modelDef is not None:
-            self.__writeCmplFile()
-
+        
         if self.__remoteMode:
-
             if not self.__cmplServerRunning:
                 raise CmplException("Model is not connected to a CmplServer")
 
@@ -795,11 +689,8 @@ class Cmpl(threading.Thread):
             self.__solutions = CmplSolutions()
 
             tries = 0
-            while True:
-                # loop is intended for CMPLGrid
-
+            while True: # loop is intended for CMPLGrid
                 self.__isCleaned = False
-
                 try:
                     if self.__remoteStatus == CMPLSERVER_CLEANED:
                         self.connect(self.__cmplUrl)
@@ -816,11 +707,11 @@ class Cmpl(threading.Thread):
                             if (time.time() - startTime) >= self.__maxCmplServerQueuingTime:
                                 self.__cleanUp()
                                 raise CmplException("maximum CmplServer queuing time is exceeded.")
-
+                    
                     self.send()
-
+        
                     if self.__debug:
-                        instFile = self.__problem + ".cinst"
+                        instFile = self.__baseName + ".cinst"
                         try:
                             f = open(instFile, 'w')
                             f.write(self.__instStr)
@@ -840,13 +731,10 @@ class Cmpl(threading.Thread):
                             raise CmplException("maximum CmplServer queuing time is exceeded.")
 
                     self.retrieve()
-
                     break
 
                 except CmplException as e:
-
                     if self.__serverMode == CMPL_GRID and self.__remoteStatus == CMPLSERVER_ERROR and self.__cmplGridSchedulerUrl != "":
-
                         try:
                             self.__cmplServerExecute("cmplServerFailed")
                             self.__handleOutput(
@@ -856,7 +744,6 @@ class Cmpl(threading.Thread):
                             self.__cmplGridSchedulerUrl = ""
                             self.__cmplGridScheduler = None
                             self.__cmplServer = None
-
                         except  CmplException as e:
                             raise CmplException("CmplGridScheduler failed: " + e.msg)
 
@@ -867,89 +754,51 @@ class Cmpl(threading.Thread):
                         continue
                     else:
                         raise CmplException(e.msg)
-
+                    
         else:
-            if not os.path.isfile(self.__model):
-                raise CmplException("CMPL file " + self.__model + " does not exist.")
+            tmpPrefix = self.__baseName
+            if self.__cmplArgs.runMode==PYCMPL:
+                tmpPrefix += "_cmpl__"+next(tempfile._get_candidate_names())
+                self.__cmplFileAlias = tmpPrefix + ".cmpl"
+                shutil.copyfile(self.__cmplFile, self.__cmplFileAlias)
+            else:
+                self.__cmplFileAlias=self.__cmplFile
 
-            self.__problem = os.path.splitext(self.__model)[0]
-
-            #tmpPrefix = "cmpl__"+self.__id+"__"+self.__problem
-            tmpPrefix = self.__problem+"_cmpl__"+self.__id
-
-            self.__cmplFile = tmpPrefix + ".cmpl"
-
-            self.__cmplDataFile = tmpPrefix  + ".cdat"
+            if self.__runMode == PYCMPL or not self.__cmplDataFile:
+                self.__cmplDataFile = tmpPrefix  + ".cdat"
+        
             self.__cmplMsgFile = tmpPrefix + ".cmsg"
             self.__cmplSolFile = tmpPrefix + ".csol"
-
-
+            
             self.__cmplDataElements()
 
             self.__status = CmplMessages(self.__cmplMsgFile)
-            self.__solutions = CmplSolutions(self.__cmplSolFile)
-
-     
-            shutil.copyfile(self.__model, self.__cmplFile)
-            
-            try:
-                cmplBin = os.environ['CMPLHOME'] + 'bin'+ os.sep +"cmpl"
-                if sys.platform.startswith('win'):
-                    cmplBin+=".exe"
-                
-                if not os.path.exists(cmplBin):
-                    raise CmplException("Can't find Cmpl binary: " + cmplBin)
-            except:
-                raise CmplException("Can't find Cmpl binary")
-
-            if self.__compatibility>2:
-                cmdList = [cmplBin, self.__cmplFile, "-solution"]
+            self.__solutions = CmplSolutions(self.__cmplSolFile)                      
+                      
+            if self.__cmplArgs.runMode==PYCMPL:
+                cmdList = [self.__cmplBinName, self.__cmplFileAlias, "-solution"]
             else:
-                cmdList = [cmplBin, self.__cmplFile, "-solution", "-e", self.__cmplMsgFile]
-           
+                cmdList = [self.__cmplBinName,  "-solution"]
 
-            if len(self.__optionsList) != 0:
+            for opt in self.__optionsList:
+                tmpOpt = self.__optionsList[opt].split()
+                for o in tmpOpt:
+                    cmdList.append(o)
+            
+            cmdList.append("-cmsg")
+            cmdList.append(self.__cmplMsgFile)
 
-                if self.__compatibility>2:
-                    for opt in self.__optionsList:
-                        tmpOpt = self.__optionsList[opt].split()
-                        for o in tmpOpt:
-                            cmdList.append(o)
-
-                else:
-                    for opt in self.__optionsList:
-                        cmdList.append("-headerOpt")
-                        cmdList.append(self.__optionsList[opt].replace(" ", "#") )
-
-            if self.__compatibility > 2:
-                cmdList.append("-cmsg")
-                cmdList.append(self.__cmplMsgFile)
-
-            #sprint(cmdList)
-            self.__cmplProc = subprocess.Popen(cmdList, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-            while True:
-                line = self.__cmplProc.stdout.readline()
-                if len(line) > 0:
-                    self.__handleOutput(line)
-                else:
-                    break
-
-            if self.__cmplProc.wait() != 0:
-                raise CmplException(self.__cmplProc.stderr.read())
-
-            self.__status.readCmplMessages()
-
-            if self.__status.cmplStatus == CMPL_FAILED:
-                raise CmplException("Cmpl finished with errors", self.__status.cmplMessageList)
+            self.__runCmpl(cmdList)
 
             self.__solutions.readSolution()
-            self.__writeSolFiles()
+            self.__solReport=CmplSolutionReport(self.__solutions)
 
             self.conByName()
             self.varByName()
+            self.__writeSolToXls()
+      
+        self.__cleanUp()
 
-            self.__cleanUp()
 
     # *********** end solve ***************
 
@@ -964,11 +813,12 @@ class Cmpl(threading.Thread):
 
     # *********** connect  ****************
     def connect(self, cmplUrl):
-
         if self.__remoteStatus != CMPL_UNKNOWN and self.__remoteStatus != CMPLSERVER_CLEANED and self.__serverMode != CMPL_GRID:
-            raise CmplException(
-                "Problem is still connected with CMPLServer: at " + cmplUrl + " with jobId " + self.__jobId)
+            raise CmplException("Problem is still connected with CMPLServer: at " + cmplUrl + " with jobId " + self.__jobId)
 
+        self.__runCmplPreComp()
+        self.setOption("-mark-used solutionAscii solutionCsv")
+         
         tries = 0
         while True:
             self.__remoteMode = True
@@ -980,13 +830,8 @@ class Cmpl(threading.Thread):
             self.__cmplGridScheduler = None
 
             try:
-
                 self.__cmplServer = xmlrpc.client.ServerProxy(cmplUrl)
-
-                self.__getSolver()
-
-                ret = self.__cmplServer.getJobId(os.path.basename(escape(self.__model)), self.__solver,
-                                                 self.__compatibility)
+                ret = self.__cmplServer.getJobId(os.path.basename(escape(self.__cmplFile)), self.__solver,self.__compatibility)
                 self.__remoteStatus = ret[0]
 
                 if self.__remoteStatus == CMPLSERVER_OK or self.__remoteStatus == CMPLGRID_SCHEDULER_OK or self.__remoteStatus == CMPLGRID_SCHEDULER_BUSY:
@@ -997,22 +842,16 @@ class Cmpl(threading.Thread):
 
                 elif self.__remoteStatus == CMPLGRID_SCHEDULER_OK or self.__remoteStatus == CMPLGRID_SCHEDULER_ERROR or self.__remoteStatus == CMPLGRID_SCHEDULER_BUSY:
                     self.__serverMode = CMPL_GRID
-                    self.__handleOutput(
-                        "Connected with CmplGridScheduler at " + self.__cmplUrl + " with jobId " + self.__jobId)
+                    self.__handleOutput("Connected with CmplGridScheduler at " + self.__cmplUrl + " with jobId " + self.__jobId)
 
                     if self.__remoteStatus == CMPLGRID_SCHEDULER_OK:
                         self.__connectServerViaScheduler(ret[1])
                         self.__serverMode = CMPL_GRID
-
             except:
                 tries += 1
 
                 ret = str(sys.exc_info()[1])
                 self.__cmplServer = None
-
-                # only relevant for pyCmpl 1.0
-                if ret.find("getJobId()") > -1:
-                    raise CmplException("Incompatible CmplServer - please install a newer CMPLServer")
 
                 if self.__remoteStatus != CMPL_UNKNOWN:
                     if tries == self.__maxCmplServerTries:
@@ -1030,7 +869,6 @@ class Cmpl(threading.Thread):
 
         self.__cmplServerRunning = True
 
-        # if self.__remoteStatus != CMPLGRID_SCHEDULER_BUSY :
         if self.__serverMode != CMPL_GRID:
             self.__handleOutput("Connected with CmplServer at " + self.__cmplUrl + " with jobId " + self.__jobId + \
                                 " >> maxServerTries <" + str(self.__maxCmplServerTries) + "> maxQueuingTime <" + \
@@ -1055,31 +893,25 @@ class Cmpl(threading.Thread):
 
     # *********** send ********************
     def send(self):
-        if self.__remoteMode:
-
+        if self.__remoteMode:       
             if not self.__cmplServerRunning:
                 raise CmplException("Model is not connected to a CmplServer")
 
             if self.__remoteStatus == CMPLSERVER_CLEANED:
                 self.connect(self.__cmplUrl)
-
+        
             self.knock()
             if self.__remoteStatus == PROBLEM_RUNNING:
                 raise CmplException("Don't send the problem again before the CmplServer finished the previous one")
-
-            self.__problem = os.path.splitext(self.__model)[0]
-            # self.__cmplSolFile = self.__problem+".csol"
 
             self.__cmplDataElements()
 
             self.__status = CmplMessages()
             self.__solutions = CmplSolutions()
-            self.__cmplInfos = CmplInfo()
-
             self.__cmplInstance = CmplInstance()
-            self.__instStr = self.__cmplInstance.cmplInstanceStr(self.__model, list(self.__optionsList.values()),
+            self.__instStr = self.__cmplInstance.cmplInstanceStr(self.__cmplFile, self.__cmplArgs, list(self.__optionsList.values()),
                                                                  self.__cmplDataStr.getvalue(), self.__jobId)
-
+     
             ret = self.__cmplServerExecute("send")
 
             self.__remoteStatus = ret[0]
@@ -1088,7 +920,6 @@ class Cmpl(threading.Thread):
                 raise CmplException(ret[1])
         else:
             raise CmplException("Cmpl::send can only be used in remote mode")
-
     # *********** end send ****************
 
     # *********** knock *******************
@@ -1104,31 +935,29 @@ class Cmpl(threading.Thread):
 
                 ret = self.__cmplServerExecute("knock")
                 self.__remoteStatus = ret[0]
-
+              
+                self.__handleOutput(ret[2])
+                
                 if self.__remoteStatus == CMPLSERVER_ERROR or self.__remoteStatus == CMPL_FAILED:
                     self.__cleanUp()
                     raise CmplException(ret[1])
-                self.__handleOutput(ret[2])
+                
         else:
             raise CmplException("Cmpl::knock can only be used in remote mode")
-
     # *********** end knock ***************
 
     # *********** retrieve ****************
     def retrieve(self):
         if self.__remoteMode:
-
             if not self.__cmplServerRunning:
                 raise CmplException("Model is not connected to a CmplServer")
 
             if self.__remoteStatus == CMPLSERVER_CLEANED:
                 raise CmplException("Model was received and cleaned from the CmplServer")
 
-            # if self.__remoteStatus == CMPL_UNKNOWN:
             self.knock()
 
             if self.__remoteStatus == PROBLEM_FINISHED:
-
                 ret = self.__cmplServerExecute("getCmplMessages")
 
                 self.__remoteStatus = ret[0]
@@ -1137,8 +966,7 @@ class Cmpl(threading.Thread):
                     raise CmplException(ret[1])
                 else:
                     self.__status.readCmplMessages(ret[2])
-                    self.__cmplMessageString = ret[2]
-
+                    
                 if self.__status.cmplStatus == CMPL_FAILED:
                     self.__cleanUp()
                     raise CmplException("Cmpl finished with errors", self.__status.cmplMessageList)
@@ -1152,19 +980,11 @@ class Cmpl(threading.Thread):
                     self.__solutionString = ret[2]
                     self.__solutions.readSolution(self.__solutionString)
 
-                self.__writeSolFiles()
-
-                '''ret = self.__cmplServerExecute("getCmplInfo")
-                self.__remoteStatus = ret[0]
-                if self.__remoteStatus == CMPLSERVER_ERROR:
-                    self.__cleanUp()
-                    raise CmplException(ret[1])
-                else:
-                    self.__cmplInfoString = ret[2]
-                    self.__cmplInfos.readCmplInfo(self.__cmplInfoString)
-
-                self.__writeInfoFiles()
-                '''
+                self.__solReport=CmplSolutionReport(self.__solutions)
+             
+                self.conByName()
+                self.varByName()
+                self.__writeSolToXls()
 
                 self.__cleanUp()
 
@@ -1178,6 +998,7 @@ class Cmpl(threading.Thread):
 
     # if self.__serverMode == CMPL_GRID:
     #	self.disconnect()
+  
     # *********** end retrieve ************
 
     # *********** cancel ******************
@@ -1204,7 +1025,6 @@ class Cmpl(threading.Thread):
                 self.__remoteStatus = CMPLSERVER_CLEANED
         else:
             self.__cleanUp()
-
     # *********** end cancel **************
 
     # *********** saveSolution ************
@@ -1212,213 +1032,57 @@ class Cmpl(threading.Thread):
         if self.__solutions.nrOfSolutions > 0:
 
             if solFileName == None:
-                solFile = self.__problem + ".csol"
+                solFile = self.__baseName + ".csol"
             else:
                 solFile = solFileName
 
-            if not self.__remoteMode:
-                pos1=self.__solutions.solFileContent.find('<instanceName>')+len('<instanceName>')
-                pos2=self.__solutions.solFileContent.find('</instanceName>')
-                self.__solutionString = self.__solutions.solFileContent[:pos1] + self.__problem + ".cmpl" + self.__solutions.solFileContent[pos2:]
-
-            try:
-                f = open(solFile, 'w')
-                f.write(self.__solutionString)
-                f.close()
-                self.__solutions.delSolFileContent()
-
-            except IOError as e:
-                raise CmplException("IO error for file " + solFile + ": " + e.strerror)
-
-            self.__handleOutput("Solution has been written to cmplSolution file: " + solFile)
-        else:
-            raise CmplException("No Solution found so far")
-
+            self.__solReport.saveSolution(self.__baseName + ".cmpl", solFile)
+            self.__handleOutput("CMPL: Solution has been written to cmplSolution file: " + solFile)
     # *********** end saveSolution ********
 
     # *********** saveSolutionAscii *******
     def saveSolutionAscii(self, solFileName=None):
         if self.__solutions.nrOfSolutions > 0:
             if solFileName == None:
-                solFile = self.__problem + ".sol"
+                solFile = self.__baseName + ".sol"
             else:
                 solFile = solFileName
             self.solutionReport(solFile)
-            self.__handleOutput("Solution has been written to ASCII file: " + solFile)
+            self.__handleOutput("CMPL: Solution has been written to ASCII file: " + solFile)
         else:
             raise CmplException("No Solution found so far")
 
     # *********** saveSolutionAscii *******
 
-    # *********** solutionReport **********
-    def solutionReport(self, fileName=None):
-
-        repStr = io.StringIO()
-        if self.__solutions.nrOfSolutions > 0:
-            repStr.write(
-                "---------------------------------------------------------------------------------------------------------\n")
-            repStr.write('%-20s %-s\n' % ("Problem", os.path.basename(self.__model)))
-
-            repStr.write('%-20s %-s\n' % ("Nr. of variables", str(self.__solutions.nrOfVariables)))
-            repStr.write('%-20s %-s\n' % ("Nr. of constraints", str(self.__solutions.nrOfConstraints)))
-            repStr.write('%-20s %-s\n' % ("Objective name", self.__solutions.objectiveName))
-            if self.__solutions.nrOfSolutions > 1:
-                repStr.write('%-20s %-s\n' % ("Nr. of solutions", str(self.__solutions.nrOfSolutions)))
-            repStr.write('%-20s %-s\n' % ("Solver name", self.__solutions.solver))
-            repStr.write('%-20s %-s\n' % ("Display variables", self.__solutions.varDisplayOptions))
-            repStr.write('%-20s %-s\n' % ("Display constraints", self.__solutions.conDisplayOptions))
-            repStr.write(
-                '---------------------------------------------------------------------------------------------------------\n')
-            for s in self.__solutions.solutions:
-                repStr.write('\n')
-                if self.__solutions.nrOfSolutions > 1:
-                    repStr.write('%-20s %-s\n' % ("Solution nr.", str(s.idx + 1)))
-                repStr.write('%-20s %-s\n' % ("Objective status", s.status))
-                repStr.write(
-                    '%-20s %-20s(%s!)\n' % ("Objective value", "%-20.2f" % s.value, self.__solutions.objectiveSense))
-                repStr.write('\n')
-                if len(s.variables) > 0:
-                    repStr.write('%-20s\n' % "Variables")
-                    repStr.write('%-20s%5s%20s%20s%20s%20s\n' % (
-                    "Name", "Type", "Activity", "LowerBound", "UpperBound", "Marginal"))
-                    repStr.write(
-                        '---------------------------------------------------------------------------------------------------------\n')
-                    for v in s.variables:
-                        if v.type == "C":
-                            repStr.write(
-                                '%-20s%5s%20.2f%20.2f%20.2f' % (v.name, v.type, v.activity, v.lowerBound, v.upperBound))
-                        else:
-                            repStr.write(
-                                '%-20s%5s%20g%20.2f%20.2f' % (v.name, v.type, v.activity, v.lowerBound, v.upperBound))
-                        if self.__solutions.isIntegerProgram:
-                            repStr.write('%20s\n' % "-")
-                        else:
-                            repStr.write('%20.2f\n' % v.marginal)
-                    repStr.write(
-                        '---------------------------------------------------------------------------------------------------------\n')
-                if len(s.constraints) > 0:
-                    repStr.write('\n')
-                    repStr.write('%-20s\n' % "Constraints")
-                    repStr.write('%-20s%5s%20s%20s%20s%20s\n' % (
-                    "Name", "Type", "Activity", "LowerBound", "UpperBound", "Marginal"))
-                    repStr.write(
-                        '---------------------------------------------------------------------------------------------------------\n')
-                    for c in s.constraints:
-                        repStr.write(
-                            '%-20s%5s%20.2f%20.2f%20.2f' % (c.name, c.type, c.activity, c.lowerBound, c.upperBound))
-                        if self.__solutions.isIntegerProgram:
-                            repStr.write('%20s\n' % "-")
-                        else:
-                            repStr.write('%20.2f\n' % c.marginal)
-                    repStr.write(
-                        '---------------------------------------------------------------------------------------------------------\n')
-
-            if fileName != None:
-                try:
-                    f = open(fileName, 'w')
-                    f.write(repStr.getvalue())
-                    f.close()
-                except IOError as e:
-                    raise CmplException("IO error for file " + fileName + ": " + e.strerror)
-            else:
-                print((repStr.getvalue()))
-
-            repStr.close()
-
-        else:
-            raise CmplException("No Solution found so far")
-
-    # *********** end solutionReport ******
-
-    # *********** saveSolutionCsv **********
+    # *********** saveSolutionCsv *******
     def saveSolutionCsv(self, solFileName=None):
-
         if self.__solutions.nrOfSolutions > 0:
-
             if solFileName == None:
-                solFile = self.__problem + ".csv"
+                solFile = self.__baseName + ".sol"
             else:
                 solFile = solFileName
-            try:
-                f = open(solFile, 'w')
-                f.write("CMPL csv export\n")
-                f.write("\n")
-                f.write("%s;%s\n" % ("Problem", os.path.basename(self.__model)))
-                f.write("%s;%g\n" % ("Nr. of variables", self.__solutions.nrOfVariables))
-                f.write("%s;%g\n" % ("Nr. of constraints", self.__solutions.nrOfConstraints))
-                f.write("%s;%s\n" % ("Objective name", self.__solutions.objectiveName))
-                if self.__solutions.nrOfSolutions > 1:
-                    f.write("%s;%g\n" % ("Nr. of solutions", self.__solutions.nrOfSolutions))
-                f.write("%s;%s\n" % ("Solver name", self.__solutions.solver))
-                f.write("%s;%s\n" % ("Display variables", self.__solutions.varDisplayOptions))
-                f.write("%s;%s\n" % ("Display constraints", self.__solutions.conDisplayOptions))
-
-                for s in self.__solutions.solutions:
-
-                    f.write("\n")
-                    if self.__solutions.nrOfSolutions > 1:
-                        f.write("%s;%g\n" % ("Solution nr", s.idx + 1))
-                    f.write("%s;%s\n" % ("Objective status", s.status))
-                    f.write("%s;%f;(%s!)\n" % ("Objective value", s.value, self.__solutions.objectiveSense))
-                    if len(s.variables) > 0:
-                        f.write("%s\n" % "Variables")
-                        f.write("%s;%s;%s;%s;%s;%s\n" % (
-                        "Name", "Type", "Activity", "LowerBound", "UpperBound", "Marginal"))
-                        for v in s.variables:
-                            if v.type == "C":
-                                f.write("%s;%s;%f;%f;%f" % (v.name, v.type, v.activity, v.lowerBound, v.upperBound))
-                            else:
-                                f.write("%s;%s;%g;%f;%f" % (v.name, v.type, v.activity, v.lowerBound, v.upperBound))
-                            if self.__solutions.isIntegerProgram:
-                                f.write(";-\n")
-                            else:
-                                f.write(";%f\n" % v.marginal)
-                    if len(s.constraints) > 0:
-                        f.write("%s\n" % "Constraints")
-                        f.write("%s;%s;%s;%s;%s;%s\n" % (
-                        "Name", "Type", "Activity", "LowerBound", "UpperBound", "Marginal"))
-                        for c in s.constraints:
-                            f.write("%s;%s;%f;%f;%f" % (c.name, c.type, c.activity, c.lowerBound, c.upperBound))
-                            if self.__solutions.isIntegerProgram:
-                                f.write(";-\n")
-                            else:
-                                f.write(";%f\n" % c.marginal)
-
-                f.close()
-                self.__handleOutput("Solution written to CSV file: " + solFile)
-            except IOError as e:
-                raise CmplException("IO error for file " + tmpName + ": " + e.strerror)
-
+            self.__solReport.saveSolutionCsv( os.path.basename(self.__cmplFile), solFile )
+            self.__handleOutput("CMPL: Solution has been written to CSV file: " + solFile)
         else:
             raise CmplException("No Solution found so far")
 
-    # *********** end saveSolutionCsv *****
+    # *********** saveSolutionCsv *******
 
-    # *********** saveDataFile ************
-    def saveDataFile(self, dataFileName=None):
-        if dataFileName == None:
-            dataFile = self.__problem + ".cdat"
-        else:
-            dataFile = solFileName
-
-        try:
-            f = open(dataFile, 'w')
-            f.write(self.__cmplDataStr.getvalue())
-            f.close()
-            self.__handleOutput("CmplData file written to file: " + dataFile)
-        except IOError as e:
-            raise CmplException("IO error for file " + instFile + ": " + e.strerror)
-
-    # *********** end saveDataFile ************
-
+    # *********** solutionReport **********
+    def solutionReport(self, fileName=None):
+        self.__solReport.solutionReport(os.path.basename(self.__cmplFile), fileName)
+    # *********** end solutionReport ******
+   
     # *********** saveCmplMessageFile ************
     def saveCmplMessageFile(self, msgFileName=None):
         if msgFileName == None or msgFileName == "":
-            fName = self.__problem + ".cmsg"
+            fName = self.__baseName + ".cmsg"
         else:
             fName = msgFileName
-        self.__writeAsciiFile(fName, self.__cmplMessageString)
-        self.__handleOutput("CmplMessages has been written to file: " + fName)
+        #self.__writeAsciiFile(fName, self.__cmplMessageString)
+        self.__handleOutput("CMPL: Writing CmplMessages to file: " + fName)
+        self.__status.writeCmplMessages(fName)
+        
 
     # *********** saveCmplMessageFile ************
 
@@ -1426,20 +1090,63 @@ class Cmpl(threading.Thread):
     # private methods								*
     # ********************************************************************************
 
+    # *********** running PreCompiler ************
+    def __runCmplPreComp(self):
+        if self.__cmplArgs.runMode==PYCMPL:
+            #print("running preComp")
+            
+            cmdList = [self.__cmplBinName, self.__cmplFile, "-o-opt", self.__preCompAlias+".optcmpl", "-o-pre", self.__preCompAlias+".precmpl" , "-o-extern", self.__preCompAlias+".extdata", "-modules" , "precomp", "-no-warn-unused"]
+            self.__cmplMsgFile
+
+            for opt in self.__optionsList:
+                tmpOpt = self.__optionsList[opt].split()
+                for o in tmpOpt:
+                    cmdList.append(o)
+
+            cmdList.append("-cmsg")
+            if not self.__cmplMsgFile:
+                self.__cmplMsgFile = os.path.splitext(self.__cmplFile)[0]+".cmsg"
+            cmdList.append(self.__cmplMsgFile)
+            self.__status = CmplMessages(self.__cmplMsgFile)
+            
+            self.__runCmpl(cmdList)
+            self.__cmplArgs.parseOptFile()
+            self.__solver=self.__cmplArgs.solver
+    # *********** end running PreCompiler ************
+    
+            
+    # *********** running Cmpl ************  
+    def __runCmpl(self, cmdList):
+        self.__cmplBinHandler = subprocess.Popen(cmdList, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        while True:
+            line = self.__cmplBinHandler.stdout.readline()
+            if len(line) > 0:
+                self.__handleOutput(line)
+            else:
+                break
+
+        if self.__cmplBinHandler.wait() != 0:
+            raise CmplException(self.__cmplBinHandler.stderr.read())
+
+        self.__status.readCmplMessages()
+
+        if self.__status.cmplStatus == CMPL_FAILED:
+            raise CmplException("Cmpl finished with errors", self.__status.cmplMessageList)
+    # *********** end running Cmpl ************  
+
+
     # *********** cleanUp ****************
     def __cleanUp(self):
-
         if not self.__isCleaned:
             if self.__debug:
                 #eval(input("Hit Enter to exit"))
                 input("Hit Enter to exit")
 
             if self.__remoteMode:
-
                 if not (self.__serverMode == CMPL_GRID and self.__cmplGridSchedulerUrl == ""):
                     # if not (self.__remoteStatus==PROBLEM_FINISHED or self.__remoteStatus==CMPLSERVER_ERROR or self.__remoteStatus==PROBLEM_CANCELED):
-                    if (
-                            self.__remoteStatus != PROBLEM_FINISHED and self.__remoteStatus != CMPLSERVER_ERROR and self.__remoteStatus != PROBLEM_CANCELED):
+                    if (self.__remoteStatus != PROBLEM_FINISHED and self.__remoteStatus != CMPLSERVER_ERROR and self.__remoteStatus != PROBLEM_CANCELED):
                         if self.__cmplServerRunning:
                             self.__cmplServerExecute("cancel")
 
@@ -1451,33 +1158,34 @@ class Cmpl(threading.Thread):
                     if self.__remoteStatus == CMPLGRID_SCHEDULER_BUSY or self.__remoteStatus == CMPLGRID_SCHEDULER_UNKNOWN:
                         self.__cmplServerExecute("disconnectFromScheduler")
 
-            elif self.__cmplProc != None:
-                if self.__cmplProc.poll() == None:
-                    self.__cmplProc.kill()
+            elif self.__cmplBinHandler != None:
+                if self.__cmplBinHandler.poll() == None:
+                    self.__cmplBinHandler.kill()
 
-            if self.__cmplDataFile != None and not self.__remoteMode:
+            if self.__cmplDataFile != None and not self.__remoteMode and (self.__cmplArgs.runMode==PYCMPL or self.__isXlsData):
                 if os.path.isfile(self.__cmplDataFile):
                     os.remove(self.__cmplDataFile)
-            if self.__cmplMsgFile != None:
+                    
+            if self.__cmplMsgFile and not self.__cmplArgs.msgFile:
                 if os.path.isfile(self.__cmplMsgFile):
                     os.remove(self.__cmplMsgFile)
-            if self.__cmplSolFile != None:
+            
+            if self.__cmplSolFile and not self.__cmplArgs.solFile:
                 if os.path.isfile(self.__cmplSolFile):
                     os.remove(self.__cmplSolFile)
 
-            if self.__cmplFile != None:
-                if os.path.isfile(self.__cmplFile):
-                    os.remove(self.__cmplFile)
+            #if self.__cmplFileAlias and self.__isAlias:
+            if self.__cmplFileAlias and self.__cmplArgs.runMode==PYCMPL:
+                if os.path.isfile(self.__cmplFileAlias):
+                    os.remove(self.__cmplFileAlias)
 
             self.__isCleaned = True
-
-        # *********** end cleanUp ************
+    # *********** end cleanUp ************
 
     # *********** writeCmplDataFile *******
     def __cmplDataElements(self):
         try:
-
-            for s in self.__setList:
+            for s in self.__setList:          
                 self.__cmplDataStr.write("%" + s.name)
 
                 if s.rank > 1:
@@ -1565,8 +1273,6 @@ class Cmpl(threading.Thread):
                                     self.__cmplDataStr.write(str(e) + '\n')
 
                     elif 'DICT' in str(type(p.values)).upper():
-                        # elif type(p.values)==dict:
-
                         if p.defaultValue != None:
 
                             if type(p.defaultValue) == str:
@@ -1614,12 +1320,9 @@ class Cmpl(threading.Thread):
                     f = open(self.__cmplDataFile, 'w')
                     f.write(self.__cmplDataStr.getvalue())
                     f.close()
-            else:
-                self.__cmplDataFile = None
 
         except IOError as e:
             raise CmplException("IO error for cmplDateFile " + self.__cmplDataFile + ": " + e.strerror)
-
     # *********** end writeCmplDataFile ***
 
     # *********** writeListElements *******
@@ -1639,33 +1342,6 @@ class Cmpl(threading.Thread):
         return tStr
 
     # *********** end __writeListElements ****
-
-    # *********** __getSolver ****************
-    def __getSolver(self):
-        solverFound = False
-        for o in list(self.__optionsList.values()):
-            if "-solver" in o:
-                self.__solver = o.split()[2].replace("\"", "")
-                solverFound = True
-                break
-        if not solverFound:
-            if self.__modelDef != None:
-                lines = self.__modelDef.split('\n')
-                for line in lines:
-                    if line.strip().startswith("%arg"):
-                        if "-solver" in line:
-                            self.__solver = line.split()[2].replace("\"", "")
-            else:
-                try:
-                    f = open(self.__model, "r")
-                    for line in f:
-                        if line.strip().startswith("%arg"):
-                            if "-solver" in line:
-                                self.__solver = line.split()[2].replace("\"", "")
-                except IOError as e:
-                    raise CmplException("Cannot read Cmpl file <" + self.__model + "> " + e.strerror)
-
-    # *********** end __getSolver ***********
 
     # *********** __solByNr ***************
     def __solByNr(self, solNr):
@@ -1706,10 +1382,8 @@ class Cmpl(threading.Thread):
                 return solElements
             else:
                 return solElement
-
         else:
             raise CmplException("No Solution found so far")
-
     # *********** end getElementByName *****
 
     # *********** elementByName ***********
@@ -1723,8 +1397,11 @@ class Cmpl(threading.Thread):
 
             if pos != -1:
                 tmpName = e.name[:pos]
-                tmpSet = e.name[pos + 1:-1].split(',')
+                if not tmpName in elemFound:
+                    exec ("self." + tmpName + "=collections.OrderedDict()")
+                    elemFound.append(tmpName)
 
+                tmpSet = e.name[pos + 1:-1].split(',')
                 tmpSetStr = io.StringIO()
                 tmpSetStr.write("(")
                 sNr = 1
@@ -1738,25 +1415,16 @@ class Cmpl(threading.Thread):
                     sNr += 1
                 tmpSetStr.write(")")
 
-                if tmpName in elemFound:
-                    exec ("self." + tmpName + ".update({" + tmpSetStr.getvalue() + ": e})")
-                else:
-                    elemFound.append(tmpName)
-                    exec ("self." + tmpName + "={" + tmpSetStr.getvalue() + ": e}")
-
+                exec ("self." + tmpName + "[" + tmpSetStr.getvalue() + "] = e")
                 tmpSetStr.close()
 
             else:
                 tmpName = e.name
                 exec ("self." + tmpName + "=e")
-
-
-
     # *********** end elementByName *******
 
     # *********** __handleOutput ************
     def __handleOutput(self, oStr):
-
         if type(oStr)==bytes:
             oStr=oStr.decode("utf-8")
         if oStr != '':
@@ -1765,9 +1433,6 @@ class Cmpl(threading.Thread):
                     print((self.__outputLeadString + oStr.strip().replace("\n", "\n" + self.__outputLeadString)))
                 else:
                     print((oStr.strip().replace("\n", "\n" + self.__outputLeadString)))
-            if self.__stringOutput:
-                self.__outputString.write(oStr)
-
     # *********** end __handleOutput ********
 
     # *********** __connectServerViaScheduler  ****************
@@ -1786,7 +1451,6 @@ class Cmpl(threading.Thread):
         except:
             self.__remoteStatus = CMPLSERVER_ERROR
             raise CmplException(str(sys.exc_info()[1]))
-
     # *********** end __connectServerViaScheduler  ****************
 
     # *********** __knockScheduler *******************
@@ -1808,7 +1472,6 @@ class Cmpl(threading.Thread):
                     self.__connectServerViaScheduler(ret[1])
         else:
             raise CmplException("Cmpl::knock can only be used in remote mode")
-
     # *********** end __knockScheduler ***************
 
     # *********** cmplServerExecute *******
@@ -1829,13 +1492,10 @@ class Cmpl(threading.Thread):
                     ret = self.__cmplServer.getCmplMessages(self.__jobId)
                 elif method == "getSolutions":
                     ret = self.__cmplServer.getSolutions(self.__jobId)
-                elif method == "getCmplInfo":
-                    ret = self.__cmplServer.getCmplInfo(self.__jobId)
                 elif method == "cmplServerFailed":
                     ret = self.__cmplGridScheduler.cmplServerFailed(self.__cmplUrl)
                 elif method == "disconnectFromScheduler":
                     ret = self.__cmplServer.disconnectProblem(self.__jobId)
-
             except:
                 tries += 1
                 if tries == self.__maxCmplServerTries:
@@ -1845,66 +1505,25 @@ class Cmpl(threading.Thread):
                 else:
                     continue
             break
-
         return ret
-
     # ******** end cmplServerExecute *******
 
-    # *********** writeSolFiles **********
-    def __writeSolFiles(self):
-        self.__handleOutput("\n")
-        if self.cmplSolFile != "":
-            if self.cmplSolFile == "cmplStandard":
-                fName = self.__problem + ".csol"
-            else:
-                fName = self.cmplSolFile
-            self.saveSolution(fName)
+    # *********** __writeSolToXls *******************
+    def __writeSolToXls(self):
+        if self.__isXlsData and self.__solutions.nrOfSolutions > 0:
+            if not self.__xlsData:
+                self.__xlsData=CmplXlsData(self.__xlsDataFile,  self.__cmplArgs)
+            if not self.__cmplArgs.isSilent:
+                print("CMPL: Writing solution to Excel file <"+self.__xlsData.xlsFile+">")
 
-        if self.asciiSolFile != "":
-            if self.asciiSolFile == "cmplStandard":
-                fName = self.__problem + ".sol"
-            else:
-                fName = self.asciiSolFile
-            self.saveSolutionAscii(fName)
+            for idx,o in enumerate(self.__xlsData.solutionElements):
+                if o.outType!="info":
+                    s = eval("self."+o.name)
+                else:
+                    s=None
+                self.__xlsData.writeSolElemToXls(s,idx, self.__solutions)
+    # *********** end __writeSolToXls *******************
 
-        if self.csvSolFile != "":
-            if self.csvSolFile == "cmplStandard":
-                fName = self.__problem + ".csv"
-            else:
-                fName = self.csvSolFile
-            self.saveSolutionCsv(fName)
-
-    # *********** end writeSolFiles ******
-
-    # *********** writeInfoFiles **********
-    def __writeInfoFiles(self):
-        self.__handleOutput("\n")
-
-        if self.__cmplInfos.statisticsFileName != "":
-            if self.__cmplInfos.statisticsFileName == "stdOut":
-                self.__handleOutput(self.__cmplInfos.statisticsText)
-                self.__handleOutput("\n")
-            else:
-                self.__writeAsciiFile(self.__cmplInfos.statisticsFileName, self.__cmplInfos.statisticsText)
-                self.__handleOutput("Statistics written to file: " + self.__cmplInfos.statisticsFileName)
-
-        if self.__cmplInfos.varProdFileName != "":
-            if self.__cmplInfos.varProdFileName == "stdOut":
-                self.__handleOutput(self.__cmplInfos.varProdText)
-                self.__handleOutput("\n")
-            else:
-                self.__writeAsciiFile(self.__cmplInfos.varProdFileName, self.__cmplInfos.varProdtext)
-                self.__handleOutput("Variable products statistics written to file: " + self.__cmplInfos.varProdFileName)
-
-        if self.__cmplInfos.matrixFileName != "":
-            if self.__cmplInfos.matrixFileName == "stdOut":
-                self.__handleOutput(self.__cmplInfos.matrixText)
-                self.__handleOutput("\n")
-            else:
-                self.__writeAsciiFile(self.__cmplInfos.matrixFileName, self.__cmplInfos.matrixText)
-                self.__handleOutput("Generated matrix written to file: " + self.__cmplInfos.matrixFileName)
-
-    # *********** end writeInfoFiles ******
 
     # *********** __writeAsciiFile  *******
     def __writeAsciiFile(self, fname, str):
@@ -1914,22 +1533,8 @@ class Cmpl(threading.Thread):
             f.close()
         except IOError as e:
             raise CmplException("IO error for file " + fname + ": " + e.strerror)
-
     # ******** end __writeAsciiFile  *******
 
-    # *********** __writeCmplFile  *******
-    def __writeCmplFile(self):
-        try:
-            self.__model = os.path.basename(self.__model)
-            self.__model = os.path.realpath(os.path.normpath(os.path.join(tempfile.gettempdir(), self.__model)))
-
-            f = open(self.__model, 'w')
-            f.write(self.__modelDef)
-            f.close()
-
-        except IOError as e:
-            raise CmplException("IO error for file " + self.__model + ": " + e.strerror)
-# ******** end __writeCmplFile  *******
 
 #################################################################################
 # End Cmpl																		

@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of pyCMPL 
  #
- #  Copyright (C) 2013
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -26,18 +26,13 @@
  #
  #**********************************************************************
 
-#!/usr/bin/python 
-
 import os
 import xml.dom.minidom as dom
 import random
 import io
-
 from xml.sax.saxutils import unescape, escape
 
-
 from .CmplException import *
-
 
 #*************** CmplInstance ***********************************
 class CmplInstance(object):
@@ -46,12 +41,15 @@ class CmplInstance(object):
 	def __init__(self):
 		
 		self.__cmplFile = ""
+		self.__cmplAlias = ""
+		self.__cmplContent=""
 		self.__optionsList = []
 		self.__dataString = ""
-		self.__cmplDataList = {}
+		self.__cmplFileList = {}
 		self.__instStr = io.StringIO()
 		self.__jobId = ""
 		self.__cmplName = ""
+		self.__args=None
 		
 	#*********** end constructor ******
 	
@@ -60,7 +58,6 @@ class CmplInstance(object):
 		self.__instStr.close()
 	#*********** end destructor *******
 		
-	
 	# getter **************************	
 	@property
 	def jobId(self):
@@ -69,86 +66,89 @@ class CmplInstance(object):
 	@property
 	def options(self):
 		return self.__optionsList
-	
 	# end getter ***********************	
 	
+
+	def __readAsciiFile(self, fName):
+		fContent=""
+		try:
+			f = open(fName, "r")
+			fContent = f.read()
+			f.close()		
+			return fContent
+		except IOError as e:
+			raise CmplException("IO error for file <"+fName+"> : "+str(e))
+
+	def __isFullPath(self, fName):
+		fullPath=False
+		if fName.startswith(os.sep) or fName[1:2] == ":":
+			fullPath = True 
+		return fullPath
+
+	def __getExternalFiles(self):
+
+		isFullPath=self.__isFullPath(self.__cmplFile)
+				
+		self.__cmplAlias=os.path.splitext(os.path.basename(self.__cmplFile))[0] 
+
+		fAlias=self.__cmplAlias+".optcmpl"
+		self.__cmplFileList[fAlias]=self.__readAsciiFile(self.__args.optAlias+".optcmpl")
+		self.__optionsList.append("-i-opt "+fAlias)
+
+		fAlias=self.__cmplAlias+".precmpl"
+		self.__cmplFileList[fAlias]=self.__readAsciiFile(self.__args.optAlias+".precmpl")
+		self.__optionsList.append("-i-pre "+fAlias)
+
+		fAlias=self.__cmplAlias+".extdata"
+		self.__cmplFileList[fAlias]=self.__readAsciiFile(self.__args.optAlias+".extdata")
+		self.__optionsList.append("-i-extern "+fAlias)
+
+		if self.__args.xlsDataFile:
+			fAlias=self.__cmplAlias+".cdat"
+
+			if isFullPath and not self.__isFullPath(self.__args.xlsDataFile):
+				self.__optionsList.append("-filealias "+os.path.dirname(self.__cmplFile)+os.sep+self.__args.xlsDataFile+"="+fAlias)
+			else:
+				self.__optionsList.append("-filealias "+self.__args.xlsDataFile+"="+fAlias)
+			self.__cmplFileList[fAlias] = self.__dataString
+					
+		for fName in self.__args.externalFiles:
+			fAlias=os.path.basename(fName)
+
+			if fName!=fAlias: 
+				if isFullPath and not self.__isFullPath(fName):
+					self.__optionsList.append("-filealias "+os.path.dirname(self.__cmplFile)+os.sep+fName+"="+fAlias)
+				else:
+					self.__optionsList.append("-filealias "+fName+"="+fAlias)
+
+			if fAlias==self.__cmplAlias+ ".cdat":
+				if not self.__dataString:
+					self.__cmplFileList[fAlias] = self.__readAsciiFile(fName)	
+				else:
+					self.__cmplFileList[fAlias] = self.__dataString
+			else:
+				self.__optionsList.append("-filealias "+fName+"="+fAlias)
+				self.__cmplFileList[fAlias] = self.__readAsciiFile(fName)	
+
+		if isFullPath:
+			self.__optionsList.append("-basename "+self.__cmplAlias)
+			
 		
 	#*********** cmplInstanceStr **********
-	def cmplInstanceStr(self, cmplFileName, optList, dataString, jobId):
-	
-		if not os.path.isfile(cmplFileName):
-			raise CmplException("CMPL file " + cmplFileName + " does not exist."  )
-		
+	def cmplInstanceStr(self, cmplFileName, cmplArgs, optList, dataString, jobId):
+
+		self.__args=cmplArgs
 		self.__cmplFile = cmplFileName
+
 		self.__optionsList = optList
 		self.__jobId = jobId
 		self.__dataString = dataString
-	
-		if self.__dataString!="":
-			self.__cmplDataList.update({ "cmplData---"+os.path.basename(os.path.splitext(self.__cmplFile)[0])+".cdat" :   self.__dataString  })
-			
-		try:
-			f = open(self.__cmplFile, "r")
-			lines = f.readlines()
-			f.close()
 
-			commentSection=False
-			
-			lineNr = 0	
-			for line in lines:
-			
-				line = line.strip()
-			
-				# besser contains
-				if line.startswith('/*'):
-					commentSection = True
-					continue
-					
-				# besser contains	
-				if line.startswith('*/'):
-					commentSection = False
-					
-				if commentSection == True:
-					continue
-					
-				if line.startswith('%data'):
-					if line.find(':') != -1:
-						tmpName = line[5:line.find(':')].strip()
-					else:
-						tmpName = line[5:].strip()
-						
-					if tmpName == "":	
-						if self.__dataString!="":
-							lines[lineNr] = line.replace("%data", "%data cmplData---"+os.path.basename(os.path.splitext(self.__cmplFile)[0])+".cdat ") + "\n"
-							tmpName="cmplData---"
-							
-						else:				
-							tmpName=os.path.basename(os.path.splitext(self.__cmplFile)[0])+".cdat" 
-				
-								
-					if not (tmpName in self.__cmplDataList or tmpName=="cmplData---"):
-					
-						tmpName1=os.path.dirname(os.path.abspath(cmplFileName))+"/"+tmpName
-						
-						if not os.path.isfile(tmpName1):
-							raise CmplException("cmplDataFile " + tmpName1 + " does not exist."  )
-						
-						f = open(tmpName1, "r")
-						dataLines = f.readlines()
-						f.close()		
-					
-						tmpString = io.StringIO()
-						for dline in dataLines:
-							tmpString.write(dline)
-								
-						self.__cmplDataList.update({ tmpName :  tmpString.getvalue()  })
-						tmpString.close()
-				
-				lineNr += 1
-				
-					
+		self.__getExternalFiles()
+		
+		try:
 			self.__instStr.write("<?xml version = \"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
-			self.__instStr.write("<CmplInstance version=\"1.0\">\n")
+			self.__instStr.write("<CmplInstance version=\"2.0\">\n")
 			self.__instStr.write("<general>\n")
 			self.__instStr.write("<name>"+os.path.basename(self.__cmplFile)+"</name>\n")
 			self.__instStr.write("<jobId>"+self.__jobId+"</jobId>\n")
@@ -161,37 +161,25 @@ class CmplInstance(object):
 				self.__instStr.write("</options>\n")
 			
 			self.__instStr.write("<problemFiles>\n")
-			self.__instStr.write("<file name=\""+ escape(os.path.basename(self.__cmplFile))+ "\" type=\"cmplMain\">\n")
 			
-			
-			for line in lines:
-				self.__instStr.write(escape(line))
-				#self.__instStr.write(b64encode(line))
-			
-			
-			#self.__instStr.write("\n")	
-			
-			self.__instStr.write("</file>\n")	
-			
-			for d in self.__cmplDataList:
-				self.__instStr.write("<file name=\""+ d + "\" type=\"cmplData\">\n")	
-				#self.__instStr.write(b64encode(self.__cmplDataList[d]))
-				self.__instStr.write(escape(self.__cmplDataList[d]))
+			for d in self.__cmplFileList:
+				self.__instStr.write("<file name=\""+ d + "\">\n")
+				self.__instStr.write(escape(self.__cmplFileList[d]) )
 				self.__instStr.write("\n")	
 				self.__instStr.write("</file>\n")
 			self.__instStr.write("</problemFiles>\n")	
 			self.__instStr.write("</CmplInstance>\n")	
-    		
+
 		except IOError as e:
-			raise CmplException("IO error : "+e)
+			raise CmplException("IO error : "+str(e))
 		
 		return self.__instStr.getvalue()
 		
 	#*********** end cmplInstanceStr ******	
+
 		
 	#*********** writeCmplInstance **********
 	def writeCmplInstance(self, folder, instStr):	
-	
 		if os.path.exists(folder) == False:
 			raise CmplException("Path <"+self.__cmplServerPath+"> doesn't exist.")
 			
@@ -201,11 +189,10 @@ class CmplInstance(object):
 			raise CmplException("Cant't read cmplInstance file - wrong file type!")
 			
 		for entry in instDom.firstChild.childNodes: 
-		
 				if entry.nodeName == "general":
 					for entry1 in entry.childNodes:
 						if entry1.nodeName == "name":
-							self.__cmplName = unescape(entry1.firstChild.data.strip())
+							self.__cmplName = unescape( entry1.firstChild.data.strip() , entities={ "&apos;":"'"} )
 							continue
 						if entry1.nodeName == "jobId":
 							self.__jobId = entry1.firstChild.data.strip()
@@ -220,9 +207,7 @@ class CmplInstance(object):
 					for entry1 in entry.childNodes: 
 						if entry1.nodeName == "file":
 							tmpName = folder+self.__jobId+os.sep+entry1.getAttribute("name")
-							#tmpContent = b64decode(entry1.firstChild.data.strip())
-							tmpContent = unescape(entry1.firstChild.data.strip())
-							
+							tmpContent = unescape(entry1.firstChild.data.strip() , entities={ "&apos;":"'"})
 							try:
 								f = open(tmpName, 'w')
 								f.write(tmpContent)		

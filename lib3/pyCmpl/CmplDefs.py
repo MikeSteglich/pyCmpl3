@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of pyCMPL 
  #
- #  Copyright (C) 2013, 2014
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -26,7 +26,6 @@
  #
  #**********************************************************************
 
-##!/usr/bin/python 
 	
 #*************** general definitions  ****************************
 #don't change the entries, because this would cause a lot of confusions
@@ -63,6 +62,15 @@ CMPL_GRID  = 22
 STANDALONE_SERVER = 23
 SERVER_UNKNOWN = 24
 
+CMPL_LOCAL   = 25
+CMPL_REMOTE_SOLVE   = 26
+CMPL_REMOTE_SEND    = 27
+CMPL_REMOTE_KNOCK   = 28    
+CMPL_REMOTE_RETRIEVE    = 30
+CMPL_REMOTE_CANCEL = 31
+PYCMPL = 32
+
+
 CMPL_STATUS_TXT = { CMPL_UNKNOWN    : "CMPL_UNKNOWN" , \
                     CMPL_OK         : "CMPL_OK", \
                     CMPL_WARNINGS   : "CMPL_WARNINGS ", \
@@ -87,7 +95,14 @@ CMPL_STATUS_TXT = { CMPL_UNKNOWN    : "CMPL_UNKNOWN" , \
                     CMPLGRID_SCHEDULER_PROBLEM_DELETED  : "CMPLGRID_SCHEDULER_PROBLEM_DELETED", \
                     CMPL_GRID  : "CMPL_GRID", \
                     STANDALONE_SERVER  : "STANDALONE_SERVER", \
-                    SERVER_UNKNOWN  : "SERVER_UNKNOWN"}
+                    SERVER_UNKNOWN  : "SERVER_UNKNOWN", \
+                    CMPL_LOCAL   : "CMPL_LOCAL", \
+                    CMPL_REMOTE_SOLVE :  "CMPL_REMOTE_SOLVE", \
+                    CMPL_REMOTE_SEND  :  "CMPL_REMOTE_SEND",  \
+                    CMPL_REMOTE_KNOCK :  "CMPL_REMOTE_KNOCK",  \
+                    CMPL_REMOTE_RETRIEVE :   "CMPL_REMOTE_RETRIEVE", \
+                    CMPL_REMOTE_CANCEL : "CMPL_REMOTE_CANCEL"
+                    }
 
 
 #*************** end general definitions  ************************

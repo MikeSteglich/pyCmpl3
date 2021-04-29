@@ -1,7 +1,7 @@
 #***********************************************************************
  #  This code is part of pyCMPL 
  #
- #  Copyright (C) 2013
+ #  Copyright (C) 
  #  Mike Steglich - Technical University of Applied Sciences
  #  Wildau, Germany 
  #
@@ -25,9 +25,6 @@
  #  along with this program; if not, see <http://www.gnu.org/licenses/>.
  #
  #**********************************************************************
-
-#!/usr/bin/python 
-
 
 from math import *
 
@@ -82,7 +79,6 @@ class CmplSet(object):
 				raise CmplException("unexpected values for set " + self.__name + " : " + str(val1) + " is not a list")
 			else:
 				if 'LIST' in str(type(val1[0])).upper()  or 'TUPLE' in str(type(val1[0])).upper():
-				#if type(val1[0]) == list or type(val1[0]) == tuple:
 					if len(val1[0])!=self.__rank:
 						raise CmplException("Rank and number of indexing entries for set " + self.__name + " : " + str(val1[0]) + " don't match.")
 					self.__type = 1
@@ -136,8 +132,6 @@ class CmplSet(object):
 	#*********** set **********
 	@property
 	def values(self):
-	#	if self.__type == 0 or self.__type == 1:
-	#		return self.__valueList		
 		if self.__type == 0: 
 			return self.__valueList		
 			
