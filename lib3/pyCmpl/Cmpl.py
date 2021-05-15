@@ -163,6 +163,7 @@ class Cmpl(threading.Thread):
         self.__solReport = None
         
         self.__outputLeadString = os.path.basename(os.path.splitext(self.__cmplFile)[0]) + "> "
+        self.__flushCounter=0
 
     # *********** end constructor ********
 
@@ -1093,8 +1094,7 @@ class Cmpl(threading.Thread):
     # *********** running PreCompiler ************
     def __runCmplPreComp(self):
         if self.__cmplArgs.runMode==PYCMPL:
-            #print("running preComp")
-            
+           
             cmdList = [self.__cmplBinName, self.__cmplFile, "-o-opt", self.__preCompAlias+".optcmpl", "-o-pre", self.__preCompAlias+".precmpl" , "-o-extern", self.__preCompAlias+".extdata", "-modules" , "precomp", "-no-warn-unused"]
             self.__cmplMsgFile
 
@@ -1121,8 +1121,8 @@ class Cmpl(threading.Thread):
         
         while True:
             line = self.__cmplBinHandler.stdout.readline()
-            if len(line) > 0:
-                self.__handleOutput(line)
+            if line:
+                self.__handleOutput(line)                
             else:
                 break
 
@@ -1427,12 +1427,19 @@ class Cmpl(threading.Thread):
     def __handleOutput(self, oStr):
         if type(oStr)==bytes:
             oStr=oStr.decode("utf-8")
-        if oStr != '':
+        if oStr:
             if self.__printOutput:
-                if self.__outputLeadString != '':
-                    print((self.__outputLeadString + oStr.strip().replace("\n", "\n" + self.__outputLeadString)))
+                self.__flushCounter+=1
+                if self.__outputLeadString :
+                    #print((self.__outputLeadString + oStr.strip().replace("\n", "\n" + self.__outputLeadString)))
+                    print(self.__outputLeadString  +oStr.strip())
                 else:
-                    print((oStr.strip().replace("\n", "\n" + self.__outputLeadString)))
+                    #print((oStr.strip().replace("\n", "\n" + self.__outputLeadString)))
+                    print(oStr.strip())
+                if self.__flushCounter>10:
+                    sys.stdout.flush()
+                    self.__flushCounter=0
+      
     # *********** end __handleOutput ********
 
     # *********** __connectServerViaScheduler  ****************

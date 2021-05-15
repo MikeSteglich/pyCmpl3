@@ -40,6 +40,7 @@ import re
 import time
 import subprocess
 import math
+import copy
 
 #*************** InputSet ***********************************
 class InputSet:
@@ -76,13 +77,13 @@ class InputParameter:
 
 #*************** OutputElement ***********************************
 class OutputElement:
-    def __init__(self, name , defSets, cellRange, outType, lineNr=0):
+    def __init__(self, name , defSets, cellRange, outType, sheet, lineNr=0):
         if "[" in name:
             self.name=name[: name.find("[")].strip() 
         else:
             self.name=name
         self.sets=defSets
-        self.sheet=""
+        self.sheet=sheet
         if "!" in cellRange:
             val = re.findall('(.*)\!(.*)',cellRange)
             self.sheet=val[0][0].strip()
@@ -90,8 +91,8 @@ class OutputElement:
         else:
             self.cellRange=cellRange
         self.lineNr=lineNr
-
         self.outType = outType
+        self.indices = []
 #*************** end OutputElement ***********************************      
 
 #*************** CmplXlsData ***********************************
@@ -165,8 +166,9 @@ class CmplXlsData:
             val = re.findall('(.*)\<(.*)\>',valString)
         else:
             val = re.findall('(.*)\[(.*)\]',valString)
-
-        if len(val[0])<2:
+       
+        #if len(val[0])<2:
+        if not val:
             self.__error( "inclomplete entry imbedded in < and >  or [ and ]" )
            
         return (val[0][0].strip(),val[0][1].strip())
@@ -191,13 +193,15 @@ class CmplXlsData:
         if "[" in valString:
             (tmp, setString) = self.__splitNameVal(valString, "set")
             setList = setString.split(",")
+            for n,s in enumerate(setList):
+                setList[n]=s.strip()
         return setList
     #*************** end __defSets ***********************************
 
     #*************** __outputNameType ***********************************
     def __outputNameType(self,valString):
         outList=re.findall("(.*)\.(.*)",valString)
-        if len(outList[0])<2 or not outList[0][1] in ("name","activity", "type", "lowerbound", "upperbound", "marginal" ):
+        if not outList or len(outList[0])<2 or not outList[0][1] in ("name","activity", "type", "lowerbound", "upperbound", "marginal" ):
             self.__error(  "wrong output type " )
         return outList[0]
     #*************** end __outputNameType ***********************************
@@ -229,6 +233,7 @@ class CmplXlsData:
                 raise CmplException("IO error for CmplXlsData file <"+self.__cmplXlsDataFile+">")
         else: 
             raise CmplException("No CmplXlsData file has been specified")
+        
         lines = io.StringIO(dataString) 
 
         metaSection=False
@@ -238,7 +243,7 @@ class CmplXlsData:
         for line in lines:
             self.__lineNr += 1
             line=line.lstrip()
-
+            
             if line.startswith("@meta"):
                 metaSection=True
                 inputSection=False
@@ -258,16 +263,21 @@ class CmplXlsData:
             if  line.startswith("%"):
                 (name,val) = self.__splitNameVal(line)
                 name=name[1:]
-
+                #print(name,val)
+                
                 if metaSection:
                     if name.startswith("file"):
                         self.__xlsFile=val
                         self.__xlsFileLineNr=self.__lineNr
-                        continue
-                    if name.startswith("sheet"):
+                        if not os.path.exists(self.__xlsFile):
+                            self.__error("Can't find Excel file <" + self.__xlsFile+">")
+                        
+                    elif name.startswith("sheet"):
                         self.__activeSheet=val
                         self.__activeSheetLineNr=self.__lineNr
-                        continue
+                        
+                    else:
+                        self.__error("Unknown entry in meta section <" + name+">")
                 
                 if inputSection:
                     if " set" in name:
@@ -292,8 +302,11 @@ class CmplXlsData:
                     else:
                         (outName,outType)=self.__outputNameType(name)
                         outDefSets=self.__defSets(outName)
+                        for s in outDefSets:
+                            if not s in self.__inputSetList:
+                                self.__error(  " set <"+s+"> not defined  " )
                     outCellRange=val
-                    self.__outputList.append( OutputElement(outName,outDefSets,outCellRange,outType,self.__lineNr) )
+                    self.__outputList.append( OutputElement(outName,outDefSets,outCellRange,outType, self.__activeSheet, self.__lineNr) )
     #*************** end __readCmplXlsFile ***********************************
 
     #*************** readXlsData ***********************************
@@ -307,6 +320,7 @@ class CmplXlsData:
                     raise self.__error("Unknown sheet <"+ self.__activeSheet+ "> in Excel file <"+self.__xlsFile+">")
             else:
                 self.__activeSheet=self.__wb.sheets[0].name
+
             sht = self.__wb.sheets[self.__activeSheet]
 
             for s in self.__inputSetList.values(): 
@@ -322,13 +336,15 @@ class CmplXlsData:
                     sht = self.__wb.sheets[self.__activeSheet]
 
                 self.__setList[cmplSet.name ]= cmplSet
-
+                print("     Set <"+s.name +"> has been read")
             for p in self.__inputParList:
                 sList=[]
                 sCount=1
+
                 for s in p.sets:
                     sList.append(self.__setList[s])
                     sCount*=self.__setList[s].len
+                
                 cmplPar = CmplParameter(p.name, sList)
 
                 if p.sheet:
@@ -346,8 +362,39 @@ class CmplXlsData:
 
                 if p.sheet:
                     sht = self.__wb.sheets[self.__activeSheet]
+                
+                print("     Parameter <"+p.name +"> has been read")
 
-            #return (list(self.__setList.values()), self.__parameterList, self.__outputList)
+            for o in self.__outputList:
+                if o.outType!="info": 
+                    indices=[]
+                    firstIdx=True
+                    for s in o.sets:
+                        if indices:
+                            firstIdx=False
+                                       
+                        if not firstIdx:      
+                            tmpIndices=[]   
+                            for idx in indices:
+                                for e in self.__setList[s].values:  
+                                    tmpIdx=idx.copy() 
+                                    if type(e) in (list, tuple):
+                                        for ei in e:
+                                            tmpIdx.append(ei)
+                                    else:
+                                        tmpIdx.append(e)
+                                    tmpIndices.append(tmpIdx)
+                            indices=tmpIndices
+                        else:
+                            for e in self.__setList[s].values:
+                                if type(e)==list:
+                                    indices.append(e)
+                                elif type(e)==tuple:
+                                    indices.append( list(e) )
+                                else:
+                                    indices.append([e])
+                o.indices=indices
+           
             return (list(self.__setList.values()), self.__parameterList)
 
         except CmplException as e:
@@ -380,15 +427,22 @@ class CmplXlsData:
                     try:
                         rows = len(sht.range(o.cellRange).rows)
                         cols = len(sht.range(o.cellRange).columns) 
-                        if len(solElem)!=rows*cols:
+                        solElemLen=0
+                        if 'collections.OrderedDict' in str(type(solElem)):
+                            solElemLen=len(solElem)
+                        else:
+                            solElemLen=1
+                        if solElemLen!=rows*cols:
                             self.__lineNr=o.lineNr
                             self.__error("Wrong dimension of variable or constraint <"+o.name+"> in comparison to cellRange <"+o.cellRange+">")
                         values=None
+                        
                         if rows == 1 and cols == 1:
-                            val = eval("sol."+o.outType)
+                            val = eval("solElem."+o.outType)
                             if math.isnan(val):
                                 val = "NaN"
                             values= val
+                        #setting array in the dimensions of the excel cell range
                         elif  rows==1 and cols>1:
                             values=[0 for j in range (cols)]
                         else:
@@ -396,8 +450,21 @@ class CmplXlsData:
 
                         i=0
                         if not (rows == 1 and cols == 1):
-                            for sol in solElem.values():
-                                val = eval("sol."+o.outType)
+
+                            #print(solElem)
+                            for idx in o.indices:
+                            #for sol in solElem.values():
+                                if len(idx)>1:
+                                    key = str(tuple(idx))
+                                else:
+                                    if type(idx[0])==str:
+                                        key="'"+idx[0]+"'"
+                                    else:
+                                        key = str(idx[0])
+                                
+                                #print(key)
+                                val = eval('solElem['+key+'].'+o.outType)
+                                #val = eval("sol."+o.outType)
                                 if math.isnan(val):
                                     val = "NaN"
 
@@ -419,7 +486,8 @@ class CmplXlsData:
                         
                 if o.sheet:
                     sht = self.__wb.sheets[self.__activeSheet]
-            
+
+            print("     Solution for <"+o.name+"."+o.outType+"> has been written")
         except CmplException as e:
             raise CmplException(e.msg)
         except:

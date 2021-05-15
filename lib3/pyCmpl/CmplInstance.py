@@ -50,6 +50,7 @@ class CmplInstance(object):
 		self.__jobId = ""
 		self.__cmplName = ""
 		self.__args=None
+		self.__withPreComp=False
 		
 	#*********** end constructor ******
 	
@@ -66,6 +67,10 @@ class CmplInstance(object):
 	@property
 	def options(self):
 		return self.__optionsList
+
+	@property
+	def withPreComp(self):
+		return self.__withPreComp
 	# end getter ***********************	
 	
 
@@ -152,6 +157,7 @@ class CmplInstance(object):
 			self.__instStr.write("<general>\n")
 			self.__instStr.write("<name>"+os.path.basename(self.__cmplFile)+"</name>\n")
 			self.__instStr.write("<jobId>"+self.__jobId+"</jobId>\n")
+			self.__instStr.write("<preComp>no</preComp>\n")
 			self.__instStr.write("</general>\n")
 			
 			if len(self.__optionsList) > 0:
@@ -196,6 +202,12 @@ class CmplInstance(object):
 							continue
 						if entry1.nodeName == "jobId":
 							self.__jobId = entry1.firstChild.data.strip()
+							continue
+						if entry1.nodeName == "preComp":
+							if entry1.firstChild.data.strip()=="no":
+								self.__withPreComp=False
+							elif entry1.firstChild.data.strip()=="yes":
+								self.__withPreComp=True
 							continue
 							
 				if entry.nodeName == "options":

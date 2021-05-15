@@ -68,6 +68,7 @@ class CmplProblemHandler(object):
 		self.setLastActivityTime(time.time())
 		self.__serverId = ""
 		self.__optionsList = []
+		self.__withPreComp = False
 	#*********** end constructor *****
 	
 	# getter and setter ***************	
@@ -138,6 +139,13 @@ class CmplProblemHandler(object):
 	
 	def setOptions(self, optList):
 		self.__optionsList=optList	
+
+	@property
+	def withPreComp(self):
+		return self.__withPreComp
+	
+	def setWithPreComp(self, withPreComp):
+		self.__withPreComp=withPreComp
 	# end getter and setter *************
 #################################################################################
 # end CmplProblemHandler							
@@ -398,7 +406,7 @@ class CmplServer(object):
 	def getJobId(self, cmplProb, solver, compatibility=0):
 		
 		cmplName=unescape(cmplProb)
-	
+
 		id = "S"+self.__server.client_address[0] + "-" + strftime("%Y-%m-%d-%H-%M-%S", gmtime()) + "-" + str(random.randint(100000, 999999))
 		tmpSolver=solver.lower()
 		
@@ -564,6 +572,7 @@ class CmplServer(object):
 			
 		if status!=CMPLSERVER_ERROR:
 			self.__problemList[inst.jobId].setOptions(inst.options)
+			self.__problemList[inst.jobId].setWithPreComp(inst.withPreComp)
 		
 			if self.__checkId(inst.jobId):
 			
@@ -905,12 +914,14 @@ class CmplServer(object):
 					ret = False
 				else:
 					os.chdir( self.__cmplServerPath+id)
-	
-					cmdList = [cmplBin, "-config", ".modules-server", "-cmsg", "-solution", "-silent-start"]
-					
+					if self.__problemList[id].withPreComp:
+						problem = self.__cmplServerPath+id+os.sep+self.__problemList[id].name
+						cmdList = [cmplBin, problem, "-modules", "serverWithPreComp", "-cmsg", "-solution"]
+					else:
+						cmdList = [cmplBin, "-modules", "serverWoPreComp", "-cmsg", "-solution", "-silent-start"]
+						
 					if len(self.__problemList[id].options) != 0:
 						for opt in self.__problemList[id].options:
-							#CmplServerTools.cmplLogging( self.__logFile, str(opt)+" "+str(type(opt)))
 							tmpOpt = opt.split()
 							for o in tmpOpt:
 								cmdList.append(o)

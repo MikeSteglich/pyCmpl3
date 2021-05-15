@@ -245,10 +245,10 @@ class CmplGridScheduler(object):
 		
 		try:
 			try:
-				self.__optFileName=os.environ['CMPLSERVERPATH']+ os.sep + "cmplServer.opt"	
+				self.__optFileName=os.environ['CMPLHOME']+'bin'+os.sep+'cmplServer.opt'	
 			except:
-				self.__optFileName=os.path.dirname(os.path.abspath(sys.argv[0])) + os.sep + ".." + os.sep + "cmplServer.opt"
-			
+				raise CmplException("Can't read CmplServer option file binary <" + self.__optFileName+">")
+
 			f = open(self.__optFileName, "r") 
 			for line in f: 
 				ret=line.split("=")

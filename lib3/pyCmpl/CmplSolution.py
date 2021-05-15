@@ -108,7 +108,7 @@ class CmplSolution(object):
 		self.__idx = 0
 		self.__status = ""
 		self.__value = 0
-		self.__variables =[]
+		self.__variables = []
 		self.__constraints = []
 	#*********** end constructor ******
 	
@@ -258,38 +258,18 @@ class CmplSolutions(object):
 		x.setName(tmpList[1])
 		x.setType(tmpList[2])
 		
-		isSolverStudio=False
-		try:		
-			isSolverStudio = os.environ['SOLVERSTUDIO']=='1'
-		except:
-			pass
-		
 		if "<constraint" in line:
 			x.setActivity(float(tmpList[3]))
 		else:
 			if x.type=='I' or x.type=='B':
 				self.__isIntegerProgram=True
-				
-				if not isSolverStudio:	
-					x.setActivity(int(tmpList[3]))
-				else:
-					x.setActivity(int(tmpList[3]))
+				x.setActivity(int(tmpList[3]))
 			else:
 				x.setActivity(float(tmpList[3]))
 		
-		if not isSolverStudio:	
-			x.setLowerBound(float(tmpList[4]))
-			x.setUpperBound(float(tmpList[5]))
-		else:
-			if tmpList[4].upper()=='-INF':
-				x.setLowerBound(-1e+100)
-			else:
-				x.setLowerBound(float(tmpList[4]))
-			if tmpList[5].upper()=='INF':	
-				x.setUpperBound(1e+100)
-			else:
-				x.setUpperBound(float(tmpList[5]))
-
+		x.setLowerBound(float(tmpList[4]))
+		x.setUpperBound(float(tmpList[5]))
+		
 		if tmpList[6]=='NaN' or tmpList[6]=='-':
 			x.setMarginal(float('NaN'))
 		else: 

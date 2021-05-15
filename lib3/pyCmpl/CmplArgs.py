@@ -61,6 +61,7 @@ class CmplArgs:
 		self.__runMode = CMPL_LOCAL
 
 		self.__isSilent = False
+		self.__isDisplayOpt = False
 
 		self.__solver = "cbc"
 
@@ -140,6 +141,10 @@ class CmplArgs:
 		return self.__isSilent
 
 	@property
+	def isDisplayOpt(self):
+		return self.__isDisplayOpt
+
+	@property
 	def solver(self):
 		return self.__solver
 
@@ -153,19 +158,18 @@ class CmplArgs:
 
 		nrOfXlsDataFiles=0
 		
+		
 		try:
 			f = open(self.__optFile, "r")
-			opts = f.read()
+			lines = f.readlines()
 			f.close()
 
-			if not opts:
-				raise CmplException("Cannot read options form opt file")
-
-			lines = opts.split(os.linesep)
+			if not lines:
+				raise CmplException("Cannot read options from opt file")
 
 			for line in lines:
 				line=line.strip()
-				
+					
 				if line.startswith("#"):
 					continue
 
@@ -179,6 +183,8 @@ class CmplArgs:
 					val=""
 				else:
 					val = optList[10]
+
+				#print(key,val)
 
 				if key=="I":
 					self.__cmplFile=val[1:-1]
@@ -253,6 +259,9 @@ class CmplArgs:
 				
 				elif key=="SILENT":
 					self.__isSilent=True
+
+				elif key=="DISPLAY":
+					self.__isDisplayOpt=True
 				
 				elif key=="SOLVER":
 					self.__solver=val[1:-1]
