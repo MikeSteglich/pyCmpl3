@@ -31,8 +31,6 @@ from .CmplException import *
 from .CmplSet import *
 from .CmplParameter import *
 
-import xlwings as xw
-
 import io
 import os
 import sys
@@ -41,6 +39,9 @@ import time
 import subprocess
 import math
 import copy
+
+if sys.platform in ('darwin', 'win32'):
+    import xlwings as xw
 
 #*************** InputSet ***********************************
 class InputSet:
