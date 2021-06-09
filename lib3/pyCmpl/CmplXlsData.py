@@ -31,9 +31,10 @@ from .CmplException import *
 from .CmplSet import *
 from .CmplParameter import *
 
+import sys
 import io
 import os
-import sys
+
 import re
 import time
 import subprocess
@@ -42,6 +43,8 @@ import copy
 
 if sys.platform in ('darwin', 'win32'):
     import xlwings as xw
+
+
 
 #*************** InputSet ***********************************
 class InputSet:
@@ -129,7 +132,7 @@ class CmplXlsData:
         self.__sheetNames=[]
 
         self.__xlsDatAttributes = ("objName", "objSense" , "objValue" , "objStatus",  "nrOfVars" , "nrOfCons" ,"solver",  "solverMsg")
-        self.__cmplAttributes=("objectiveName", "objectiveSense" , "solution.value" , "solution.status",  "nrOfVariables" , "nrOfConstrains" ,"solver",  "solverMessage")
+        self.__cmplAttributes=("objectiveName", "objectiveSense" , "solution.value" , "solution.status",  "nrOfVariables" , "nrOfConstraints" ,"solver",  "solverMessage")
 
         self.__readCmplXlsFile()
 
@@ -202,7 +205,7 @@ class CmplXlsData:
     #*************** __outputNameType ***********************************
     def __outputNameType(self,valString):
         outList=re.findall("(.*)\.(.*)",valString)
-        if not outList or len(outList[0])<2 or not outList[0][1] in ("name","activity", "type", "lowerbound", "upperbound", "marginal" ):
+        if not outList or len(outList[0])<2 or not outList[0][1] in ("name","activity", "type", "lowerBound", "upperBound", "marginal" ):
             self.__error(  "wrong output type " )
         return outList[0]
     #*************** end __outputNameType ***********************************
@@ -237,7 +240,7 @@ class CmplXlsData:
         
         lines = io.StringIO(dataString) 
 
-        metaSection=False
+        sourceSection=False
         inputSection=False
         outputSection=False
         
@@ -245,18 +248,18 @@ class CmplXlsData:
             self.__lineNr += 1
             line=line.lstrip()
             
-            if line.startswith("@meta"):
-                metaSection=True
+            if line.startswith("@source"):
+                sourceSection=True
                 inputSection=False
                 outputSection=False
                 continue
             if line.startswith("@input"):
-                metaSection=False
+                sourceSection=False
                 inputSection=True
                 outputSection=False
                 continue
             if line.startswith("@output"):
-                metaSection=False
+                sourceSection=False
                 inputSection=False
                 outputSection=True
                 continue
@@ -266,7 +269,7 @@ class CmplXlsData:
                 name=name[1:]
                 #print(name,val)
                 
-                if metaSection:
+                if sourceSection:
                     if name.startswith("file"):
                         self.__xlsFile=val
                         self.__xlsFileLineNr=self.__lineNr
@@ -333,6 +336,21 @@ class CmplXlsData:
                     sht = self.__wb.sheets[s.sheet]
 
                 cmplSet.setValues( sht.range( s.cellRange ).value)
+                for i in cmplSet.values:
+                    if not i:
+                        self.__lineNr=s.lineNr
+                        raise self.__error("set <"+ s.name+">: one of the indices are empty.")
+                    if type(i)== tuple:
+                        for e in i:
+                            if re.search('\s',str(e)):
+                                self.__lineNr=s.lineNr
+                                raise self.__error("set <"+ s.name+">: index <"+ str(i)+ "> contains whitespaces.") 
+
+                    elif re.search('\s',str(i)):
+                        self.__lineNr=s.lineNr
+                        raise self.__error("set <"+ s.name+">: index <"+ str(i) + "> contains whitespaces.") 
+                     
+    
                 if s.sheet:
                     sht = self.__wb.sheets[self.__activeSheet]
 
@@ -394,7 +412,7 @@ class CmplXlsData:
                                     indices.append( list(e) )
                                 else:
                                     indices.append([e])
-                o.indices=indices
+                    o.indices=indices
            
             return (list(self.__setList.values()), self.__parameterList)
 
@@ -440,8 +458,13 @@ class CmplXlsData:
                         
                         if rows == 1 and cols == 1:
                             val = eval("solElem."+o.outType)
-                            if math.isnan(val):
-                                val = "NaN"
+                            if o.outType in ("activity", "lowerBound", "upperBound", "marginal" ):
+                                if math.isnan(val):
+                                    val = "NaN"
+                                if val==math.inf:
+                                        val="inf"
+                                if val==-math.inf:
+                                    val="-inf"
                             values= val
                         #setting array in the dimensions of the excel cell range
                         elif  rows==1 and cols>1:
@@ -452,9 +475,7 @@ class CmplXlsData:
                         i=0
                         if not (rows == 1 and cols == 1):
 
-                            #print(solElem)
                             for idx in o.indices:
-                            #for sol in solElem.values():
                                 if len(idx)>1:
                                     key = str(tuple(idx))
                                 else:
@@ -463,11 +484,14 @@ class CmplXlsData:
                                     else:
                                         key = str(idx[0])
                                 
-                                #print(key)
                                 val = eval('solElem['+key+'].'+o.outType)
-                                #val = eval("sol."+o.outType)
-                                if math.isnan(val):
-                                    val = "NaN"
+                                if o.outType in ("activity", "lowerBound", "upperBound", "marginal" ):
+                                    if math.isnan(val):
+                                        val = "NaN"
+                                    if val==math.inf:
+                                        val="inf"
+                                    if val==-math.inf:
+                                        val="-inf"
 
                                 if rows==1 and cols>1:
                                     values[i]=val
@@ -478,6 +502,7 @@ class CmplXlsData:
                                     jj=i-ii*cols
                                     values[ii][jj]= val 
                                 i+=1
+                       
                         sht.range(o.cellRange).value= values
 
                     except CmplException as e:
@@ -488,7 +513,7 @@ class CmplXlsData:
                 if o.sheet:
                     sht = self.__wb.sheets[self.__activeSheet]
 
-            print("     Solution for <"+o.name+"."+o.outType+"> has been written")
+            print("     <"+o.name+"."+o.outType+"> has been written")
         except CmplException as e:
             raise CmplException(e.msg)
         except:

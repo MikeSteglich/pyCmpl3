@@ -43,6 +43,7 @@ class CmplSolutionReport(object):
     def solutionReport(self, problemName, fileName=None):
 
         repStr = io.StringIO()
+        
         if self.__solutions.nrOfSolutions > 0:
             repStr.write(
                 "---------------------------------------------------------------------------------------------------------\n")

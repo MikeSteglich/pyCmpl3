@@ -664,18 +664,20 @@ class Cmpl(threading.Thread):
     ##### Lassen als public wenn andere Lösungen als die erste gefragt sind
     # *********** varByName ***************
     def varByName(self, solNr=0):
-        if solNr < 0 or solNr > self.__solutions.nrOfSolutions - 1:
-            raise CmplException("Solution with index " + str(solNr) + " doesn't exist.")
-        s = self.__solByNr(solNr)
-        self.__elementByName(s.variables)
+        if self.__solutions.nrOfSolutions >0:
+            if solNr < 0 or solNr > self.__solutions.nrOfSolutions - 1:
+                raise CmplException("Solution with index " + str(solNr) + " doesn't exist.")
+            s = self.__solByNr(solNr)
+            self.__elementByName(s.variables)
     # *********** end varByName ***********
 
     # *********** conByName ***************
     def conByName(self, solNr=0):
-        if solNr < 0 or solNr > self.__solutions.nrOfSolutions - 1:
-            raise CmplException("Solution with index " + str(solNr) + " doesn't exist.")
-        s = self.__solByNr(solNr)
-        self.__elementByName(s.constraints)
+        if self.__solutions.nrOfSolutions >0:
+            if solNr < 0 or solNr > self.__solutions.nrOfSolutions - 1:
+                raise CmplException("Solution with index " + str(solNr) + " doesn't exist.")
+            s = self.__solByNr(solNr)
+            self.__elementByName(s.constraints)
     # *********** end conByName ***********
 
     # *********** solve *******************
@@ -793,9 +795,10 @@ class Cmpl(threading.Thread):
 
             self.__solutions.readSolution()
             self.__solReport=CmplSolutionReport(self.__solutions)
-
+            
             self.conByName()
             self.varByName()
+
             self.__writeSolToXls()
       
         self.__cleanUp()
