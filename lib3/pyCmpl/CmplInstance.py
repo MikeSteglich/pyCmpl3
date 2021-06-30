@@ -119,6 +119,9 @@ class CmplInstance(object):
 					
 		for fName in self.__args.externalFiles:
 			fAlias=os.path.basename(fName)
+			if fAlias[-1]==":":
+				fAlias=fAlias[:-1]
+				fName=fName[:-1]
 
 			if fName!=fAlias: 
 				if isFullPath and not self.__isFullPath(fName):

@@ -756,6 +756,8 @@ class Cmpl(threading.Thread):
 
                         continue
                     else:
+                        if self.__cmplArgs.msgFile:
+                            self.saveCmplMessageFile(self.__cmplArgs.msgFile)
                         raise CmplException(e.msg)
                     
         else:
@@ -922,6 +924,12 @@ class Cmpl(threading.Thread):
             if self.__remoteStatus == CMPLSERVER_ERROR:
                 self.__cleanUp()
                 raise CmplException(ret[1])
+
+            if self.__runMode==PYCMPL:
+                os.remove(self.__preCompAlias+".optcmpl")
+                os.remove(self.__preCompAlias+".precmpl")
+                os.remove(self.__preCompAlias+".extdata")
+                
         else:
             raise CmplException("Cmpl::send can only be used in remote mode")
     # *********** end send ****************
@@ -1114,7 +1122,9 @@ class Cmpl(threading.Thread):
             
             self.__runCmpl(cmdList)
             self.__cmplArgs.parseOptFile()
+
             self.__solver=self.__cmplArgs.solver
+
     # *********** end running PreCompiler ************
     
             

@@ -103,10 +103,6 @@ class CmplArgs:
 			self.__runMode = mode
 		else:
 			raise CmplException("Wrong running mode ")
-	
-	@property
-	def msgFile(self):
-		return self.__messageFile
 
 	@property
 	def xlsDataFile(self):
