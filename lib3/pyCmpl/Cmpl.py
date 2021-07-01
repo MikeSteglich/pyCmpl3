@@ -143,7 +143,11 @@ class Cmpl(threading.Thread):
         self.__cmplBinName=""
 
         try:
-            self.__cmplBinName = os.environ['CMPLHOME'] + 'bin'+ os.sep +"cmpl"
+            self.__cmplBinName = os.environ['CMPLHOME'] 
+            if (  self.__cmplBinName[-1] != os.sep  ):  
+                self.__cmplBinName+=os.sep
+
+            self.__cmplBinName+= 'bin'+ os.sep +"cmpl"
             if sys.platform.startswith('win'):
                 self.__cmplBinName+=".exe"
         except:
@@ -1187,7 +1191,6 @@ class Cmpl(threading.Thread):
                 if os.path.isfile(self.__cmplSolFile):
                     os.remove(self.__cmplSolFile)
 
-            #if self.__cmplFileAlias and self.__isAlias:
             if self.__cmplFileAlias and self.__cmplArgs.runMode==PYCMPL:
                 if os.path.isfile(self.__cmplFileAlias):
                     os.remove(self.__cmplFileAlias)
