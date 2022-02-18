@@ -1,6 +1,5 @@
-This version is still under development. Please use pyCmpl as part of CMPL 1.12 until a first stable version of CMPL 2 and pyCmpl3 is released.
 
-*********** pyCMPL and CMPLServer ********
+*********** pyCMPL  ********
 pyCMPL is the CMPL API  for Python and an interactive shell. 
 The main idea of this API is 
 * to define sets and parameters within the user application, 
@@ -14,21 +13,7 @@ It is reasonable to solve large models remotely on the CMPLServer that is instal
 pyCMPL provides a client API for CMPLServer. CMPL provides three XML-based file formats for the communication 
 between a CMPLServer and its clients. (CmplInstance, CmplSolutions, CmplMessages, CmplInfo)
 
-
-
 For further information please visit the CMPL website (www.coliop.org). 
-
-DOCUMENTATION:
-See the Cmpl/doc subdirectory for documenation. This subdirectory contains a 
-User's Manual in pdf format. See also:
- 	
-	http://www.coliop.org
-	https://projects.coin-or.org/Cmpl
-
-
-INSTALLATION
-See the INSTALL file in the root directory.
-
 
 
 
