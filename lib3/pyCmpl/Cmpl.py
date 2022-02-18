@@ -80,6 +80,8 @@ class Cmpl(threading.Thread):
         threading.Thread.__init__(self)
 
         self.__compatibility = COMPATIBILITY
+        
+        self.__runMode = PYCMPL
 
         if type(model) != str:
             raise CmplException(str(model) + " is not a valid file name for a Cmpl file")
@@ -121,8 +123,6 @@ class Cmpl(threading.Thread):
         self.__cmplGridScheduler = None
         self.__cmplGridSchedulerUrl = ""
         self.__serverMode = SERVER_UNKNOWN
-
-        self.__runMode = PYCMPL
 
         self.__cmplServerRunning = False
 
@@ -1134,9 +1134,21 @@ class Cmpl(threading.Thread):
             
     # *********** running Cmpl ************  
     def __runCmpl(self, cmdList):
-        self.__cmplBinHandler = subprocess.Popen(cmdList, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if not LOGISTICSLAB:
+            self.__cmplBinHandler = subprocess.Popen(cmdList, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        else:
+            startupinfo = subprocess.STARTUPINFO()
+            #startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW  
+            # Prevent cmd.exe window from popping up
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= (
+                subprocess.STARTF_USESTDHANDLES | subprocess.STARTF_USESHOWWINDOW
+            )
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+
+            self.__cmplBinHandler = subprocess.Popen(cmdList, shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, startupinfo=startupinfo)
         
-        while True:
+        while True and self.__printOutput:
             line = self.__cmplBinHandler.stdout.readline()
             if line:
                 self.__handleOutput(line)                
@@ -1144,7 +1156,8 @@ class Cmpl(threading.Thread):
                 break
 
         if self.__cmplBinHandler.wait() != 0:
-            raise CmplException(self.__cmplBinHandler.stderr.read())
+            if self.__cmplBinHandler.stderr:
+                raise CmplException(self.__cmplBinHandler.stderr.read())
 
         self.__status.readCmplMessages()
 
